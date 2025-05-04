@@ -2,6 +2,6 @@
     "BUILD": "TRUE",
     "TD_VERSION": "2023.12230",
     "PROJECT_FILE": "./TouchDesigner/project.toe",
-    "REPO": "https://github.com/SudoMagicCode/td-tox-builder-template",
-    "COMP_NAME": "Empty"
+    "REPO": "https://github.com/SudoMagicCode/td-cloud-palette",
+    "COMP_NAME": "Cloud Palette"
 }

@@ -226,7 +226,7 @@ class TreeListerRow:
             "opFamilies", []) == None else data.get("opFamilies", [])
         opTypes: list = [] if data.get(
             "opTypes", []) == None else data.get("opTypes", [])
-        print(opFam)
+
         if data.get("type") == "block":
             asset_type = cloudPaletteType.folder
             isCompatible = None

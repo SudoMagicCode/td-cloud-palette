@@ -29,6 +29,20 @@ class cloudPaletteType(Enum):
     tdTemplate = 'tdTemplate'
 
 
+def _type_string_to_type(typeString: str) -> cloudPaletteType:
+    type_map = {
+        'template': cloudPaletteType.tdTemplate,
+        'tdComp': cloudPaletteType.tdComp,
+        'File folder': cloudPaletteType.folder,
+        'TouchDesigner Component': cloudPaletteType.tdComp
+    }
+    return type_map.get(typeString, cloudPaletteType.notYetAssigned)
+
+
+def _check_compatible(tdVersionString: str) -> bool:
+    return tdVersionString != f'{app.version}.{app.build}'
+
+
 class TreeListerRow:
     def __init__(self):
         self.display_name: str = ''
@@ -97,35 +111,8 @@ class TreeListerRow:
         ]
         return row_list
 
-
-class RowBuilderFactory:
-    def __init__(self):
-        pass
-
-    def _type_string_to_type(self, typeString: str) -> cloudPaletteType:
-        type_map = {
-            'template': cloudPaletteType.tdTemplate,
-            'tdComp': cloudPaletteType.tdComp,
-            'File folder': cloudPaletteType.folder,
-            'TouchDesigner Component': cloudPaletteType.tdComp
-        }
-        return type_map.get(typeString, cloudPaletteType.notYetAssigned)
-
-    def _check_compatible(self, tdVersionString: str) -> bool:
-        return tdVersionString != f'{app.version}.{app.build}'
-
-    def Build_folder_row(self, data: dict) -> TreeListerRow:
-        newRow = TreeListerRow()
-        author: str = data.get('author')
-        block: str = data.get('block')
-
-        newRow.display_name = block if block != '' else author
-        newRow.lister_path = f'creator/{author}/{block}' if block != '' else f'creator/{author}'
-        newRow.assetType = cloudPaletteType.folder
-
-        return newRow
-
-    def Build_row_from_api_response(self, data: dict) -> TreeListerRow:
+    @staticmethod
+    def from_api_response(data: dict):
         # create new row
         newRow = TreeListerRow()
 
@@ -151,16 +138,29 @@ class RowBuilderFactory:
         newRow.is_tox = True
         newRow.is_local = False
         newRow.asset_url = f'{base_uri}latest/{asset_path}'
-        newRow.assetType = self._type_string_to_type(type_string)
+        newRow.assetType = _type_string_to_type(type_string)
         newRow.tdVersion = td_version
         newRow.toxVersion = tox_version
         newRow.lastSaved = last_saved
-        newRow.compatible = self._check_compatible(td_version)
+        newRow.compatible = _check_compatible(td_version)
         newRow.opFamilies = op_families
         newRow.opTypes = op_types
         return newRow
 
-    def Build_row_from_folder_dat(self, headerLookupMap: dict, data: dict) -> TreeListerRow:
+    @staticmethod
+    def folder_row(data: dict):
+        newRow = TreeListerRow()
+        author: str = data.get('author')
+        block: str = data.get('block')
+
+        newRow.display_name = block if block != '' else author
+        newRow.lister_path = f'creator/{author}/{block}' if block != '' else f'creator/{author}'
+        newRow.assetType = cloudPaletteType.folder
+
+        return newRow
+
+    @staticmethod
+    def from_folder_dat(headerLookupMap: dict, data: dict):
         source_data = data.get('source_data')
         author: str = data.get('author')
         display_name: str = source_data[headerLookupMap.get('basename')].val
@@ -170,7 +170,7 @@ class RowBuilderFactory:
 
         split_rel_path = rel_path.split('/')
 
-        asset_type: cloudPaletteType = self._type_string_to_type(
+        asset_type: cloudPaletteType = _type_string_to_type(
             type_from_folder)
 
         if asset_type == cloudPaletteType.folder:
@@ -181,7 +181,7 @@ class RowBuilderFactory:
             }
 
             # create a new folder row
-            newRow = self.Build_folder_row(folder_row_data)
+            newRow = TreeListerRow.folder_row(folder_row_data)
             newRow.is_local = True
 
         else:
@@ -198,4 +198,56 @@ class RowBuilderFactory:
 
             newRow.lister_path = f'creator/{author}/{rel_path}/{display_name}'
 
+        return newRow
+
+    @staticmethod
+    def from_github_response_folder_row(author: str):
+        newRow = TreeListerRow()
+        newRow.display_name = author
+        newRow.lister_path = f"creator/{author}"
+        newRow.assetType = cloudPaletteType.folder
+        return newRow
+
+    @staticmethod
+    def from_github_response(data: dict, author: str):
+        newRow = TreeListerRow()
+
+        asset_name: str = data.get("display_name", "unknown")
+        lister_path: str = data.get("path", "unknown")
+        asset_path: str = "" if data.get(
+            "asset_path") == None else data.get("asset_path")
+        td_version: str = "" if data.get(
+            "td_version") == None else data.get("td_version")
+        tox_version: str = "" if data.get(
+            "tox_version") == None else data.get("tox_version")
+        last_saved: str = "" if data.get(
+            "last_updated") == None else data.get("last_updated")
+        opFam: list = [] if data.get(
+            "opFamilies", []) == None else data.get("opFamilies", [])
+        opTypes: list = [] if data.get(
+            "opTypes", []) == None else data.get("opTypes", [])
+        print(opFam)
+        if data.get("type") == "block":
+            asset_type = cloudPaletteType.folder
+            isCompatible = None
+            is_tox = False
+
+        else:
+            asset_type = _type_string_to_type(data.get("type"))
+            isCompatible: bool = _check_compatible(td_version)
+            is_tox = True
+
+        # assign attributes to newRow object
+        newRow.display_name = asset_name
+        newRow.lister_path = f"creator/{author}/{lister_path}"
+        newRow.is_tox = is_tox
+        newRow.is_local = False
+        newRow.asset_url = asset_path
+        newRow.assetType = asset_type
+        newRow.tdVersion = td_version
+        newRow.toxVersion = tox_version
+        newRow.lastSaved = last_saved
+        newRow.compatible = isCompatible
+        newRow.opFamilies = opFam
+        newRow.opTypes = opTypes
         return newRow

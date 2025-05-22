@@ -1,6 +1,7 @@
 import json
 import os
 import listerDataInterface
+import remoteSources
 import saveUtils
 
 
@@ -20,8 +21,7 @@ class PaletteExplorer:
         self.access_token: str = ""
         self.Has_access_token = tdu.Dependency(False)
         self.Check_access_token()
-
-        self.Row_builder = listerDataInterface.RowBuilderFactory()
+        self.Remote_sources: list[remoteSources.RemoteSources] = []
 
         self.MyOp = myOp
 
@@ -31,6 +31,8 @@ class PaletteExplorer:
         self.upload_settings_COMP = myOp.op('iparUploadSettings')
 
         self.Remote_assets: dict = {}
+
+        self.Remote_data: dict = []
 
         self.PaletteWindowCOMP = myOp.op('window_palette')
         self.PlacementWindowCOMP = myOp.op('window_placement')
@@ -120,16 +122,33 @@ class PaletteExplorer:
         # resets lister
         self._lister_COMP.par.Refresh.pulse()
 
+        self._gather_remote_sources()
+
         # refresh assets
         self._query_cloud()
 
-    def _query_cloud(self) -> None:
+    def _query_cloud(self,) -> None:
         """
         """
         # set url for inventory
         self.webClientDAT.par.url = self.inventory
         # pulse par and wait for response
         self.webClientDAT.par.request.pulse()
+
+    def _gather_remote_sources(self):
+        # empty remote sources
+        self.Remote_sources.clear()
+
+        # rebuild remote sources based on contents
+        for each_block in parent.cloudPalette.seq.Remotesources.blocks:
+            new_remote = remoteSources.RemoteSources.sourceFromBlock(
+                each_block)
+            self.Remote_sources.append(new_remote)
+
+            # get remote data
+            print(f"remote source {new_remote.name}")
+            self.webClientDAT.par.url = new_remote.remote
+            self.webClientDAT.par.request.pulse()
 
     def Refresh_inventory(self):
         self._set_ui_status('Refreshing Inventory')
@@ -151,6 +170,18 @@ class PaletteExplorer:
                 self.Has_inventory = True
                 self.asset_treeDAT.cook(force=True)
 
+            case 'application/octet-stream':
+                disposition: str = headerDict.get(
+                    "content-disposition", ".").split(".")[-1]
+
+                match disposition:
+                    case "json":
+                        # NOTE KEEP TRACK HERE
+                        data: dict = json.loads(data.decode())
+                        self.Remote_data.append(data)
+                        self.asset_treeDAT.cook(force=True)
+                    case _:
+                        pass
             case _:
                 pass
 
@@ -467,13 +498,33 @@ class PaletteExplorer:
         self._asset_tree_list.val.append(listerDataInterface.header_row)
 
         # add all elements from API
-        self._add_asset_tree_elements_from_api()
+        # self._add_asset_tree_elements_from_api()
+
+        # add all elements from remotes
+        self._add_asset_tree_elements_from_remotes()
 
         # add all elements from folder DAT
-        self._add_asset_tree_elements_from_table(
-            author='Derivative', tableSource=self._td_palette_DAT)
+        # self._add_asset_tree_elements_from_table(
+        #     author='Derivative', tableSource=self._td_palette_DAT)
 
         return self._asset_tree_list
+
+    def _add_asset_tree_elements_from_remotes(self) -> None:
+        for each in self.Remote_data:
+            collections = each.get("collections")
+            for each_collection in collections:
+                author: str = each_collection.get("author")
+                author_row: listerDataInterface.TreeListerRow = listerDataInterface.TreeListerRow.from_github_response_folder_row(
+                    author)
+                self._asset_tree_list.val.append(author_row.as_list)
+
+                for each_element in each_collection.get("contents", []):
+                    new_row: listerDataInterface.TreeListerRow = listerDataInterface.TreeListerRow.from_github_response(
+                        each_element, author)
+                    try:
+                        self._asset_tree_list.val.append(new_row.as_list)
+                    except Exception as e:
+                        print(e)
 
     def _add_asset_tree_elements_from_api(self) -> None:
         # reset user inventory blocks
@@ -494,7 +545,8 @@ class PaletteExplorer:
                 new_row_data['author'] = each_author.get('author')
 
                 # build row for author - this is a folder
-                new_row = self.Row_builder.Build_folder_row(data=new_row_data)
+                new_row = listerDataInterface.TreeListerRow.folder_row(
+                    data=new_row_data)
                 self._asset_tree_list.val.append(new_row.as_list)
                 # print('adding author row')
 
@@ -502,8 +554,9 @@ class PaletteExplorer:
                     new_row_data['block'] = each_block.get('block')
 
                     # build a row for the folder - this is a folder
-                    new_row = self.Row_builder.Build_folder_row(
+                    new_row = listerDataInterface.TreeListerRow.folder_row(
                         data=new_row_data)
+
                     self._asset_tree_list.val.append(new_row.as_list)
                     # print('--->adding block row', each_block.get('block'))
                     self.inventory_blocks.append(each_block.get('block'))
@@ -512,8 +565,9 @@ class PaletteExplorer:
                         new_row_data['asset_data'] = each_asset
 
                         # build a row for the asset - his is an actual tox
-                        new_row = self.Row_builder.Build_row_from_api_response(
+                        new_row = listerDataInterface.TreeListerRow.from_api_response(
                             data=new_row_data)
+
                         self._asset_tree_list.val.append(new_row.as_list)
                         # print('------->adding asset row', new_row.display_name)
 
@@ -528,8 +582,9 @@ class PaletteExplorer:
             each_cell.val: each_cell.col for each_cell in headers}
 
         # add author row
-        author_row = self.Row_builder.Build_folder_row(
+        author_row = listerDataInterface.TreeListerRow.folder_row(
             data={'author': 'Derivative', 'block': ''})
+
         author_row.display_name = 'Derivative'
         self._asset_tree_list.val.append(author_row.as_list)
 
@@ -539,7 +594,7 @@ class PaletteExplorer:
                 'source_data': each_row
             }
 
-            new_row = self.Row_builder.Build_row_from_folder_dat(headerLookupMap=header_lookup_map,
-                                                                 data=new_row_data)
+            new_row = listerDataInterface.TreeListerRow.from_folder_dat(headerLookupMap=header_lookup_map,
+                                                                        data=new_row_data)
 
             self._asset_tree_list.val.append(new_row.as_list)

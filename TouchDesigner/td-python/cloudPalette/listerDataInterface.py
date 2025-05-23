@@ -209,13 +209,13 @@ class TreeListerRow:
         return newRow
 
     @staticmethod
-    def from_github_response(data: dict, author: str):
+    def from_github_response(data: dict, author: str, source: str):
         newRow = TreeListerRow()
-
+        print(data)
         asset_name: str = data.get("display_name", "unknown")
         lister_path: str = data.get("path", "unknown")
         asset_path: str = "" if data.get(
-            "asset_path") == None else data.get("asset_path")
+            "asset_path") == None else f'https://{source}/releases/latest/download/{data.get("asset_path")}'
         td_version: str = "" if data.get(
             "td_version") == None else data.get("td_version")
         tox_version: str = "" if data.get(
@@ -236,7 +236,7 @@ class TreeListerRow:
             asset_type = _type_string_to_type(data.get("type"))
             isCompatible: bool = _check_compatible(td_version)
             is_tox = True
-
+        print(lister_path)
         # assign attributes to newRow object
         newRow.display_name = asset_name
         newRow.lister_path = f"creator/{author}/{lister_path}"

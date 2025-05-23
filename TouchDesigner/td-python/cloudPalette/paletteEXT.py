@@ -2,7 +2,7 @@ import json
 import os
 import listerDataInterface
 import remoteSources
-import saveUtils
+import localSaveUtils
 
 
 class PaletteExplorer:
@@ -112,7 +112,6 @@ class PaletteExplorer:
                 self.asset_treeDAT.cook(force=True)
 
             case 'application/octet-stream':
-                debug(headerDict)
                 disposition: str = headerDict.get(
                     "content-disposition", ".").split(".")[-1]
 
@@ -420,20 +419,18 @@ class PaletteExplorer:
 
     def _add_asset_tree_elements_from_remotes(self) -> None:
         for each in self.Remote_data:
-            collections = each.get("collections")
-            for each_collection in collections:
-                author: str = each_collection.get("author")
-                author_row: listerDataInterface.TreeListerRow = listerDataInterface.TreeListerRow.from_github_response_folder_row(
-                    author)
-                self._asset_tree_list.val.append(author_row.as_list)
 
-                for each_element in each_collection.get("contents", []):
-                    new_row: listerDataInterface.TreeListerRow = listerDataInterface.TreeListerRow.from_github_response(
-                        each_element, author)
-                    try:
-                        self._asset_tree_list.val.append(new_row.as_list)
-                    except Exception as e:
-                        print(e)
+            author: str = each.get("author")
+            author_row: listerDataInterface.TreeListerRow = listerDataInterface.TreeListerRow.from_github_response_folder_row(
+                author)
+            self._asset_tree_list.val.append(author_row.as_list)
+            source = each.get("source")
+
+            for each_element in each.get("collection", []):
+
+                new_row: listerDataInterface.TreeListerRow = listerDataInterface.TreeListerRow.from_github_response(
+                    data=each_element, author=author, source=source)
+                self._asset_tree_list.val.append(new_row.as_list)
 
     def _add_asset_tree_elements_from_table(self, author: str, tableSource: op) -> None:
         headers = tableSource.row(0)

@@ -1,5 +1,10 @@
 from enum import Enum
 
+try:
+    from SudoMagic.entities import cloudPaletteTypes
+except Exception as e:
+    from cloudPaletteType import cloudPaletteTypes
+
 header_row = [
     'name',
     'path',
@@ -22,21 +27,14 @@ header_row = [
 ]
 
 
-class cloudPaletteType(Enum):
-    notYetAssigned = 'empty'
-    folder = 'folder'
-    tdComp = 'tdComp'
-    tdTemplate = 'tdTemplate'
-
-
-def _type_string_to_type(typeString: str) -> cloudPaletteType:
+def _type_string_to_type(typeString: str) -> cloudPaletteTypes:
     type_map = {
-        'template': cloudPaletteType.tdTemplate,
-        'tdComp': cloudPaletteType.tdComp,
-        'File folder': cloudPaletteType.folder,
-        'TouchDesigner Component': cloudPaletteType.tdComp
+        cloudPaletteTypes.tdTemplate.name: cloudPaletteTypes.tdTemplate,
+        cloudPaletteTypes.tdComp.name: cloudPaletteTypes.tdComp,
+        cloudPaletteTypes.folder.name: cloudPaletteTypes.folder,
+        cloudPaletteTypes.tdComp.name: cloudPaletteTypes.tdComp
     }
-    return type_map.get(typeString, cloudPaletteType.notYetAssigned)
+    return type_map.get(typeString, cloudPaletteTypes.notYetAssigned)
 
 
 def _check_compatible(tdVersionString: str) -> bool:
@@ -51,7 +49,7 @@ class TreeListerRow:
         self.is_local: bool = False
         self.asset_url: str = ''
         self.asset_local_path: str = ''
-        self.assetType: cloudPaletteType = cloudPaletteType.notYetAssigned
+        self.assetType: cloudPaletteTypes = cloudPaletteTypes.notYetAssigned
         self.tdVersion: str = ''
         self.toxVersion: str = ''
         self.lastSaved: str = ''
@@ -96,7 +94,7 @@ class TreeListerRow:
             self.is_local,
             self.asset_local_path,
             self.asset_url,
-            self.assetType.value,
+            self.assetType.name,
             self.tdVersion,
             self.toxVersion,
             self.lastSaved,
@@ -155,7 +153,7 @@ class TreeListerRow:
 
         newRow.display_name = block if block != '' else author
         newRow.lister_path = f'creator/{author}/{block}' if block != '' else f'creator/{author}'
-        newRow.assetType = cloudPaletteType.folder
+        newRow.assetType = cloudPaletteTypes.folder
 
         return newRow
 
@@ -170,10 +168,10 @@ class TreeListerRow:
 
         split_rel_path = rel_path.split('/')
 
-        asset_type: cloudPaletteType = _type_string_to_type(
+        asset_type: cloudPaletteTypes = _type_string_to_type(
             type_from_folder)
 
-        if asset_type == cloudPaletteType.folder:
+        if asset_type == cloudPaletteTypes.folder:
             # create a folder row
             folder_row_data: dict = {
                 'author': author,
@@ -201,17 +199,18 @@ class TreeListerRow:
         return newRow
 
     @staticmethod
-    def from_github_response_folder_row(author: str):
+    def from_github_response_folder_row(*args):
         newRow = TreeListerRow()
-        newRow.display_name = author
-        newRow.lister_path = f"creator/{author}"
-        newRow.assetType = cloudPaletteType.folder
+        newRow.display_name = args[-1]
+        newRow.lister_path = f"creator/{'/'.join([each for each in args])}"
+        newRow.assetType = cloudPaletteTypes.folder
         return newRow
 
     @staticmethod
-    def from_github_response(data: dict, author: str, source: str):
+    def from_github_response(data: dict, author: str, source: str, sourceMap: dict):
         newRow = TreeListerRow()
-        print(data)
+        sub_path: str = sourceMap.get(source)
+
         asset_name: str = data.get("display_name", "unknown")
         lister_path: str = data.get("path", "unknown")
         asset_path: str = "" if data.get(
@@ -227,19 +226,14 @@ class TreeListerRow:
         opTypes: list = [] if data.get(
             "opTypes", []) == None else data.get("opTypes", [])
 
-        if data.get("type") == "block":
-            asset_type = cloudPaletteType.folder
-            isCompatible = None
-            is_tox = False
+        asset_type = _type_string_to_type(data.get("type"))
+        isCompatible: bool = _check_compatible(td_version)
+        is_tox = True if asset_type in [
+            cloudPaletteTypes.tdComp, cloudPaletteTypes.tdTemplate] else False
 
-        else:
-            asset_type = _type_string_to_type(data.get("type"))
-            isCompatible: bool = _check_compatible(td_version)
-            is_tox = True
-        print(lister_path)
         # assign attributes to newRow object
         newRow.display_name = asset_name
-        newRow.lister_path = f"creator/{author}/{lister_path}"
+        newRow.lister_path = f"creator/{author}/{sub_path}/{lister_path}"
         newRow.is_tox = is_tox
         newRow.is_local = False
         newRow.asset_url = asset_path

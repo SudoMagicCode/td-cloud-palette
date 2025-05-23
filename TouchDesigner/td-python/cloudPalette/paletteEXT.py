@@ -2,7 +2,6 @@ import json
 import os
 import listerDataInterface
 import remoteSources
-import localSaveUtils
 
 
 class PaletteExplorer:
@@ -19,6 +18,7 @@ class PaletteExplorer:
         self.Has_inventory = False
         self.log_decorator = "CLOUD PALETTE"
         self.Remote_sources: list[remoteSources.RemoteSources] = []
+        self.remote_sources_map: dict = {}
 
         self._local_cache = myOp.op('base_cloud_palette_cache/base_empty')
 
@@ -80,12 +80,14 @@ class PaletteExplorer:
     def _gather_remote_sources(self):
         # empty remote sources
         self.Remote_sources.clear()
+        self.remote_sources_map.clear()
 
         # rebuild remote sources based on contents
         for each_block in parent.cloudPalette.seq.Remotesources.blocks:
             new_remote = remoteSources.RemoteSources.sourceFromBlock(
                 each_block)
             self.Remote_sources.append(new_remote)
+            self.remote_sources_map[new_remote.remote] = new_remote.name
 
             # get remote data
             print(f"remote source {new_remote.name}")
@@ -121,6 +123,12 @@ class PaletteExplorer:
                         data: dict = json.loads(data.decode())
                         self.Remote_data.append(data)
                         self.asset_treeDAT.cook(force=True)
+
+                    case "tox":
+                        self.CreatePaletteTOX(
+                            request_response=data, from_bytes=True)
+                        self.current_tox_info = {}
+
                     case _:
                         pass
             case _:
@@ -420,16 +428,22 @@ class PaletteExplorer:
     def _add_asset_tree_elements_from_remotes(self) -> None:
         for each in self.Remote_data:
 
+            # create row for author
             author: str = each.get("author")
             author_row: listerDataInterface.TreeListerRow = listerDataInterface.TreeListerRow.from_github_response_folder_row(
                 author)
             self._asset_tree_list.val.append(author_row.as_list)
             source = each.get("source")
 
-            for each_element in each.get("collection", []):
+            # create row for any sub organizational element
+            sub_path_row: listerDataInterface.TreeListerRow = listerDataInterface.TreeListerRow.from_github_response_folder_row(
+                author, self.remote_sources_map.get(source))
+            self._asset_tree_list.val.append(sub_path_row.as_list)
 
+            # create rows for each item in collection
+            for each_element in each.get("collection", []):
                 new_row: listerDataInterface.TreeListerRow = listerDataInterface.TreeListerRow.from_github_response(
-                    data=each_element, author=author, source=source)
+                    data=each_element, author=author, source=source, sourceMap=self.remote_sources_map)
                 self._asset_tree_list.val.append(new_row.as_list)
 
     def _add_asset_tree_elements_from_table(self, author: str, tableSource: op) -> None:

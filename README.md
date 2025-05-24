@@ -8,3 +8,10 @@ If you are using the [TouchDesigner Dependency Manager](https://github.com/SudoM
 ```shell
 tdm add package github.com/SudoMagicCode/td-cloud-palette
 ``` 
+## Cloud Palette Compatible Repos
+There are several repos available on github that contain collections that can be easily added to Cloud Palette. Below is a collection of the resources that you can add easily to Cloud Palette.
+
+Name | Access | Description |
+--- | --- | --- |
+[SM TD Templates](https://github.com/SudoMagicCode/sm-td-templates) | 🌎 Public | A collection of starting points for networks
+[SM TD Tools](https://github.com/SudoMagicCode/sm-td-tools) | 🌎 Public | A collection of drop in tools

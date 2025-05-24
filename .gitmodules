@@ -1,3 +1,6 @@
 [submodule "TouchDesigner/td-python/SudoMagic"]
 	path = TouchDesigner/td-python/SudoMagic
 	url = https://github.com/SudoMagicCode/sudo_td_python_tools
+[submodule "scripts"]
+	path = scripts
+	url = https://github.com/SudoMagicCode/td-build-scripts.git

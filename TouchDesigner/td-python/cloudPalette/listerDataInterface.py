@@ -1,5 +1,10 @@
 from enum import Enum
 
+try:
+    from SudoMagic.entities import cloudPaletteTypes
+except Exception as e:
+    from cloudPaletteType import cloudPaletteTypes
+
 header_row = [
     'name',
     'path',
@@ -22,11 +27,18 @@ header_row = [
 ]
 
 
-class cloudPaletteType(Enum):
-    notYetAssigned = 'empty'
-    folder = 'folder'
-    tdComp = 'tdComp'
-    tdTemplate = 'tdTemplate'
+def _type_string_to_type(typeString: str) -> cloudPaletteTypes:
+    type_map = {
+        cloudPaletteTypes.tdTemplate.name: cloudPaletteTypes.tdTemplate,
+        cloudPaletteTypes.tdComp.name: cloudPaletteTypes.tdComp,
+        cloudPaletteTypes.folder.name: cloudPaletteTypes.folder,
+        cloudPaletteTypes.tdComp.name: cloudPaletteTypes.tdComp
+    }
+    return type_map.get(typeString, cloudPaletteTypes.notYetAssigned)
+
+
+def _check_compatible(tdVersionString: str) -> bool:
+    return tdVersionString != f'{app.version}.{app.build}'
 
 
 class TreeListerRow:
@@ -37,7 +49,7 @@ class TreeListerRow:
         self.is_local: bool = False
         self.asset_url: str = ''
         self.asset_local_path: str = ''
-        self.assetType: cloudPaletteType = cloudPaletteType.notYetAssigned
+        self.assetType: cloudPaletteTypes = cloudPaletteTypes.notYetAssigned
         self.tdVersion: str = ''
         self.toxVersion: str = ''
         self.lastSaved: str = ''
@@ -82,7 +94,7 @@ class TreeListerRow:
             self.is_local,
             self.asset_local_path,
             self.asset_url,
-            self.assetType.value,
+            self.assetType.name,
             self.tdVersion,
             self.toxVersion,
             self.lastSaved,
@@ -97,35 +109,8 @@ class TreeListerRow:
         ]
         return row_list
 
-
-class RowBuilderFactory:
-    def __init__(self):
-        pass
-
-    def _type_string_to_type(self, typeString: str) -> cloudPaletteType:
-        type_map = {
-            'template': cloudPaletteType.tdTemplate,
-            'tdComp': cloudPaletteType.tdComp,
-            'File folder': cloudPaletteType.folder,
-            'TouchDesigner Component': cloudPaletteType.tdComp
-        }
-        return type_map.get(typeString, cloudPaletteType.notYetAssigned)
-
-    def _check_compatible(self, tdVersionString: str) -> bool:
-        return tdVersionString != f'{app.version}.{app.build}'
-
-    def Build_folder_row(self, data: dict) -> TreeListerRow:
-        newRow = TreeListerRow()
-        author: str = data.get('author')
-        block: str = data.get('block')
-
-        newRow.display_name = block if block != '' else author
-        newRow.lister_path = f'creator/{author}/{block}' if block != '' else f'creator/{author}'
-        newRow.assetType = cloudPaletteType.folder
-
-        return newRow
-
-    def Build_row_from_api_response(self, data: dict) -> TreeListerRow:
+    @staticmethod
+    def from_api_response(data: dict):
         # create new row
         newRow = TreeListerRow()
 
@@ -151,16 +136,29 @@ class RowBuilderFactory:
         newRow.is_tox = True
         newRow.is_local = False
         newRow.asset_url = f'{base_uri}latest/{asset_path}'
-        newRow.assetType = self._type_string_to_type(type_string)
+        newRow.assetType = _type_string_to_type(type_string)
         newRow.tdVersion = td_version
         newRow.toxVersion = tox_version
         newRow.lastSaved = last_saved
-        newRow.compatible = self._check_compatible(td_version)
+        newRow.compatible = _check_compatible(td_version)
         newRow.opFamilies = op_families
         newRow.opTypes = op_types
         return newRow
 
-    def Build_row_from_folder_dat(self, headerLookupMap: dict, data: dict) -> TreeListerRow:
+    @staticmethod
+    def folder_row(data: dict):
+        newRow = TreeListerRow()
+        author: str = data.get('author')
+        block: str = data.get('block')
+
+        newRow.display_name = block if block != '' else author
+        newRow.lister_path = f'creator/{author}/{block}' if block != '' else f'creator/{author}'
+        newRow.assetType = cloudPaletteTypes.folder
+
+        return newRow
+
+    @staticmethod
+    def from_folder_dat(headerLookupMap: dict, data: dict):
         source_data = data.get('source_data')
         author: str = data.get('author')
         display_name: str = source_data[headerLookupMap.get('basename')].val
@@ -170,10 +168,10 @@ class RowBuilderFactory:
 
         split_rel_path = rel_path.split('/')
 
-        asset_type: cloudPaletteType = self._type_string_to_type(
+        asset_type: cloudPaletteTypes = _type_string_to_type(
             type_from_folder)
 
-        if asset_type == cloudPaletteType.folder:
+        if asset_type == cloudPaletteTypes.folder:
             # create a folder row
             folder_row_data: dict = {
                 'author': author,
@@ -181,7 +179,7 @@ class RowBuilderFactory:
             }
 
             # create a new folder row
-            newRow = self.Build_folder_row(folder_row_data)
+            newRow = TreeListerRow.folder_row(folder_row_data)
             newRow.is_local = True
 
         else:
@@ -198,4 +196,52 @@ class RowBuilderFactory:
 
             newRow.lister_path = f'creator/{author}/{rel_path}/{display_name}'
 
+        return newRow
+
+    @staticmethod
+    def from_github_response_folder_row(*args):
+        newRow = TreeListerRow()
+        newRow.display_name = args[-1]
+        newRow.lister_path = f"creator/{'/'.join([each for each in args])}"
+        newRow.assetType = cloudPaletteTypes.folder
+        return newRow
+
+    @staticmethod
+    def from_github_response(data: dict, author: str, source: str, sourceMap: dict):
+        newRow = TreeListerRow()
+        sub_path: str = sourceMap.get(source)
+
+        asset_name: str = data.get("display_name", "unknown")
+        lister_path: str = data.get("path", "unknown")
+        asset_path: str = "" if data.get(
+            "asset_path") == None else f'https://{source}/releases/latest/download/{data.get("asset_path")}'
+        td_version: str = "" if data.get(
+            "td_version") == None else data.get("td_version")
+        tox_version: str = "" if data.get(
+            "tox_version") == None else data.get("tox_version")
+        last_saved: str = "" if data.get(
+            "last_updated") == None else data.get("last_updated")
+        opFam: list = [] if data.get(
+            "opFamilies", []) == None else data.get("opFamilies", [])
+        opTypes: list = [] if data.get(
+            "opTypes", []) == None else data.get("opTypes", [])
+
+        asset_type = _type_string_to_type(data.get("type"))
+        isCompatible: bool = _check_compatible(td_version)
+        is_tox = True if asset_type in [
+            cloudPaletteTypes.tdComp, cloudPaletteTypes.tdTemplate] else False
+
+        # assign attributes to newRow object
+        newRow.display_name = asset_name
+        newRow.lister_path = f"creator/{author}/{sub_path}/{lister_path}"
+        newRow.is_tox = is_tox
+        newRow.is_local = False
+        newRow.asset_url = asset_path
+        newRow.assetType = asset_type
+        newRow.tdVersion = td_version
+        newRow.toxVersion = tox_version
+        newRow.lastSaved = last_saved
+        newRow.compatible = isCompatible
+        newRow.opFamilies = opFam
+        newRow.opTypes = opTypes
         return newRow

@@ -1,7 +1,7 @@
 import json
 import os
 import listerDataInterface
-import saveUtils
+import remoteSources
 
 
 class PaletteExplorer:
@@ -12,25 +12,19 @@ class PaletteExplorer:
         """
         """
         self.__repr__ = 'Class <PaletteExplorer>'
-        self.inventory: str = 'https://sudo-tools-td-templates.sudo.codes/builds/latest/inventory.json'
+        self.MyOp = myOp
+
         self.inventory_blocks = []
         self.Has_inventory = False
         self.log_decorator = "CLOUD PALETTE"
-        self.access_token_file: str = f'{app.preferencesFolder}/cloudPaletteAccessToken.txt'
-        self.access_token: str = ""
-        self.Has_access_token = tdu.Dependency(False)
-        self.Check_access_token()
-
-        self.Row_builder = listerDataInterface.RowBuilderFactory()
-
-        self.MyOp = myOp
+        self.Remote_sources: list[remoteSources.RemoteSources] = []
+        self.remote_sources_map: dict = {}
 
         self._local_cache = myOp.op('base_cloud_palette_cache/base_empty')
-        self._preflight_cache = myOp.op(
-            'base_cloud_palette_cache/base_preflight')
-        self.upload_settings_COMP = myOp.op('iparUploadSettings')
 
         self.Remote_assets: dict = {}
+
+        self.Remote_data: dict = []
 
         self.PaletteWindowCOMP = myOp.op('window_palette')
         self.PlacementWindowCOMP = myOp.op('window_placement')
@@ -68,68 +62,37 @@ class PaletteExplorer:
         data_dict = {}
         return data_dict
 
-    def Check_access_token(self):
-        if os.path.isfile(self.access_token_file):
-            # validate api key
-            self.Has_access_token.val = True
-            with open(self.access_token_file, "r") as f:
-                self.access_token = f.read()
-        else:
-            self.Has_access_token.val = False
-
-    def add_access_token(self, access_token: str) -> str:
-        with open(self.access_token_file, 'w+') as file:
-            print('[~] CloudPalette - adding access token')
-            file.write(access_token)
-
-    def remove_access_token(self) -> None:
-        print('[~] CloudPalette - removing access token')
-        if self.Has_access_token.val:
-            # delete access token
-            os.remove(self.access_token_file)
-            # update status of access token
-            self.Has_access_token.val = False
-
-    def Add_api_key(self) -> None:
-        def dialogChoice(info):
-            button_choice = info.get('buttonNum')
-            access_token = info.get('enteredText')
-            print(info)
-            match button_choice:
-                case 2:
-                    if access_token == '':
-                        print('[~] missing api key')
-                    else:
-                        self.add_access_token(access_token)
-                        self.Check_access_token()
-                case _:
-                    pass
-
-        op.TDResources.PopDialog.OpenDefault(
-            title='CloudPalette Config',
-            text='Add a CloudPalette API Key',
-            textEntry=True,
-            buttons=['Cancel', 'Add'],
-            escButton=1,
-            enterButton=1,
-            callback=dialogChoice
-        )
-
     def _setup(self) -> None:
         """All set-up procedures for UI"""
         # resets lister
         self._lister_COMP.par.Refresh.pulse()
 
+        self._gather_remote_sources()
+
         # refresh assets
         self._query_cloud()
 
-    def _query_cloud(self) -> None:
+    def _query_cloud(self,) -> None:
         """
         """
-        # set url for inventory
-        self.webClientDAT.par.url = self.inventory
-        # pulse par and wait for response
-        self.webClientDAT.par.request.pulse()
+        pass
+
+    def _gather_remote_sources(self):
+        # empty remote sources
+        self.Remote_sources.clear()
+        self.remote_sources_map.clear()
+
+        # rebuild remote sources based on contents
+        for each_block in parent.cloudPalette.seq.Remotesources.blocks:
+            new_remote = remoteSources.RemoteSources.sourceFromBlock(
+                each_block)
+            self.Remote_sources.append(new_remote)
+            self.remote_sources_map[new_remote.remote] = new_remote.name
+
+            # get remote data
+            print(f"remote source {new_remote.name}")
+            self.webClientDAT.par.url = new_remote.remote_inventory
+            self.webClientDAT.par.request.pulse()
 
     def Refresh_inventory(self):
         self._set_ui_status('Refreshing Inventory')
@@ -138,7 +101,6 @@ class PaletteExplorer:
     def Parse_cloud_response(self, data, headerDict: dict):
         """
         """
-
         match headerDict.get('content-type'):
             case 'binary/octet-stream':
                 # we've downloaded a tox
@@ -151,6 +113,24 @@ class PaletteExplorer:
                 self.Has_inventory = True
                 self.asset_treeDAT.cook(force=True)
 
+            case 'application/octet-stream':
+                disposition: str = headerDict.get(
+                    "content-disposition", ".").split(".")[-1]
+
+                match disposition:
+                    case "json":
+                        # NOTE KEEP TRACK HERE
+                        data: dict = json.loads(data.decode())
+                        self.Remote_data.append(data)
+                        self.asset_treeDAT.cook(force=True)
+
+                    case "tox":
+                        self.CreatePaletteTOX(
+                            request_response=data, from_bytes=True)
+                        self.current_tox_info = {}
+
+                    case _:
+                        pass
             case _:
                 pass
 
@@ -418,36 +398,6 @@ class PaletteExplorer:
 
                         pass
 
-    def Palette_drop_event(self, comp: op, info: dict) -> None:
-        '''handles palette drop event'''
-        to_be_uploaded_op = info.get('dragItems')
-        self._upload_op = saveUtils.SaveOp(
-            tdOperator=to_be_uploaded_op[0], opCache=self._preflight_cache, accessToken=self.access_token)
-        self.upload_settings_COMP.par.Showuploadsettings = True
-
-    def Upload_tox_to_cloud(self) -> None:
-        '''uploads tox to the cloud'''
-        self._upload_op.save()
-        self.upload_settings_COMP.par.Showuploadsettings = False
-        parent.cloudPalette.par.Showuploadzone = False
-        self._clear_upload_settings()
-
-    def Cancel_upload(self) -> None:
-        self.upload_settings_COMP.par.Showuploadsettings = False
-        self._clear_upload_settings()
-
-    def _clear_upload_settings(self) -> None:
-        pars = ['Author', 'Toxname', 'Toxversion1',
-                'Toxversion2', 'Toxversion3']
-        for each_par in pars:
-            default_value = self.upload_settings_COMP.par[each_par].default
-            self.upload_settings_COMP.par[each_par] = default_value
-
-    def prompt_password(self) -> None:
-        """
-        """
-        op('../base_license').par.Openlicensewindow.pulse()
-
     def Edit_search(self, search_val: str) -> None:
         """Updates filter string par
         """
@@ -466,60 +416,35 @@ class PaletteExplorer:
         self._asset_tree_list = tdu.Dependency([])
         self._asset_tree_list.val.append(listerDataInterface.header_row)
 
-        # add all elements from API
-        self._add_asset_tree_elements_from_api()
+        # add all elements from remotes
+        self._add_asset_tree_elements_from_remotes()
 
         # add all elements from folder DAT
-        self._add_asset_tree_elements_from_table(
-            author='Derivative', tableSource=self._td_palette_DAT)
+        # self._add_asset_tree_elements_from_table(
+        #     author='Derivative', tableSource=self._td_palette_DAT)
 
         return self._asset_tree_list
 
-    def _add_asset_tree_elements_from_api(self) -> None:
-        # reset user inventory blocks
-        self.inventory_blocks = []
+    def _add_asset_tree_elements_from_remotes(self) -> None:
+        for each in self.Remote_data:
 
-        new_row_data = {
-            'author': '',
-            'block': '',
-            'base_uri': '',
-            'asset_data': {}
-        }
+            # create row for author
+            author: str = each.get("author")
+            author_row: listerDataInterface.TreeListerRow = listerDataInterface.TreeListerRow.from_github_response_folder_row(
+                author)
+            self._asset_tree_list.val.append(author_row.as_list)
+            source = each.get("source")
 
-        try:
-            new_row_data['base_uri'] = self.Remote_assets.get(
-                'setup').get('base_uri')
+            # create row for any sub organizational element
+            sub_path_row: listerDataInterface.TreeListerRow = listerDataInterface.TreeListerRow.from_github_response_folder_row(
+                author, self.remote_sources_map.get(source))
+            self._asset_tree_list.val.append(sub_path_row.as_list)
 
-            for each_author in self.Remote_assets.get('collections'):
-                new_row_data['author'] = each_author.get('author')
-
-                # build row for author - this is a folder
-                new_row = self.Row_builder.Build_folder_row(data=new_row_data)
+            # create rows for each item in collection
+            for each_element in each.get("collection", []):
+                new_row: listerDataInterface.TreeListerRow = listerDataInterface.TreeListerRow.from_github_response(
+                    data=each_element, author=author, source=source, sourceMap=self.remote_sources_map)
                 self._asset_tree_list.val.append(new_row.as_list)
-                # print('adding author row')
-
-                for each_block in each_author.get('contents'):
-                    new_row_data['block'] = each_block.get('block')
-
-                    # build a row for the folder - this is a folder
-                    new_row = self.Row_builder.Build_folder_row(
-                        data=new_row_data)
-                    self._asset_tree_list.val.append(new_row.as_list)
-                    # print('--->adding block row', each_block.get('block'))
-                    self.inventory_blocks.append(each_block.get('block'))
-
-                    for each_asset in each_block.get('assets'):
-                        new_row_data['asset_data'] = each_asset
-
-                        # build a row for the asset - his is an actual tox
-                        new_row = self.Row_builder.Build_row_from_api_response(
-                            data=new_row_data)
-                        self._asset_tree_list.val.append(new_row.as_list)
-                        # print('------->adding asset row', new_row.display_name)
-
-        except Exception as e:
-            print('[~] Something went wrong adding rows from api data')
-            print(e)
 
     def _add_asset_tree_elements_from_table(self, author: str, tableSource: op) -> None:
         headers = tableSource.row(0)
@@ -528,8 +453,9 @@ class PaletteExplorer:
             each_cell.val: each_cell.col for each_cell in headers}
 
         # add author row
-        author_row = self.Row_builder.Build_folder_row(
+        author_row = listerDataInterface.TreeListerRow.folder_row(
             data={'author': 'Derivative', 'block': ''})
+
         author_row.display_name = 'Derivative'
         self._asset_tree_list.val.append(author_row.as_list)
 
@@ -539,7 +465,7 @@ class PaletteExplorer:
                 'source_data': each_row
             }
 
-            new_row = self.Row_builder.Build_row_from_folder_dat(headerLookupMap=header_lookup_map,
-                                                                 data=new_row_data)
+            new_row = listerDataInterface.TreeListerRow.from_folder_dat(headerLookupMap=header_lookup_map,
+                                                                        data=new_row_data)
 
             self._asset_tree_list.val.append(new_row.as_list)

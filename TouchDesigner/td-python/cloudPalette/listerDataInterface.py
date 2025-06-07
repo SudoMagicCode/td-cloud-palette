@@ -1,9 +1,6 @@
 from enum import Enum
 
-try:
-    from SudoMagic.entities import cloudPaletteTypes
-except Exception as e:
-    from cloudPaletteType import cloudPaletteTypes
+from cloudPaletteType import cloudPaletteTypes
 
 header_row = [
     'name',

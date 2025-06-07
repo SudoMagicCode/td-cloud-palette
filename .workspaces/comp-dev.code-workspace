@@ -5,5 +5,18 @@
 			"path": "../TouchDesigner"
 		}
 	],
-	"settings": {}
+	"settings": {
+		"python.defaultInterpreterPath": "C:\\Program Files\\Derivative\\TouchDesigner.2025.30060\\bin\\python.exe",
+		"python.analysis.autoSearchPaths": true,
+		"python.autoComplete.extraPaths": [
+			"C:\\Program Files\\Derivative\\TouchDesigner.2025.30060\\bin\\python\\Lib\\site-packages",
+			".\\scripts",
+			".\\TDDepthAnythingHF_vEnv\\Lib\\site-packages",
+		],
+		"python.analysis.extraPaths": [
+			"C:\\Program Files\\Derivative\\TouchDesigner.2025.30060\\bin\\python\\Lib\\site-packages",
+			".\\scripts",
+			".\\TDDepthAnythingHF_vEnv\\Lib\\site-packages",
+		],
+	}
 }

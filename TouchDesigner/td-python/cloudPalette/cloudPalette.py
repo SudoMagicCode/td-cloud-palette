@@ -2,13 +2,17 @@ import json
 import os
 import listerDataInterface
 import remoteSources
+import tdi
+import pathlib
+import downloader
+import decoratedLog
 
 
 class PaletteExplorer:
     """
     """
 
-    def __init__(self, myOp: op):
+    def __init__(self, myOp: tdi.baseCOMP):
         """
         """
         self.__repr__ = 'Class <PaletteExplorer>'
@@ -17,6 +21,8 @@ class PaletteExplorer:
         self.inventory_blocks = []
         self.Has_inventory = False
         self.log_decorator = "CLOUD PALETTE"
+        self.decoratedLog = decoratedLog.DecoratedLog(
+            logDecorator=self.log_decorator)
         self.Remote_sources: list[remoteSources.RemoteSources] = []
         self.remote_sources_map: dict = {}
 
@@ -44,19 +50,23 @@ class PaletteExplorer:
 
         self.current_tox_info: dict = {}
 
-        self._upload_op: callable = None
-
         self._asset_tree_list = tdu.Dependency([])
+
+        self._local_cache: pathlib.Path = None
 
         self._setup()
 
-        print(f'PaletteExplorer init from {myOp}')
+        self.decoratedLog.log_to_textport(f'PaletteExplorer init from {myOp}')
 
         pass
 
     @property
     def Asset_tree_list(self) -> list:
         return self._asset_tree_list
+
+    @property
+    def Local_cache(self) -> str:
+        return self._local_cache
 
     def Get_treeLister_data(self) -> dict:
         data_dict = {}
@@ -72,10 +82,26 @@ class PaletteExplorer:
         # refresh assets
         self._query_cloud()
 
+        # check for and build a local cache
+        self._check_local_cache()
+
     def _query_cloud(self,) -> None:
         """
         """
         pass
+
+    def _check_local_cache(self) -> None:
+        derivative_folder = pathlib.Path(app.userPaletteFolder).parent
+        cloud_palette_folder = pathlib.Path(
+            f"{derivative_folder}/cloudPalette")
+        if os.path.isdir(cloud_palette_folder):
+            pass
+        else:
+            self.decoratedLog.log_to_textport(
+                f'creating directory {cloud_palette_folder}')
+            os.makedirs(cloud_palette_folder)
+
+        self._local_cache = cloud_palette_folder
 
     def _gather_remote_sources(self):
         # empty remote sources
@@ -90,7 +116,8 @@ class PaletteExplorer:
             self.remote_sources_map[new_remote.remote] = new_remote.name
 
             # get remote data
-            print(f"remote source {new_remote.name}")
+            self.decoratedLog.log_to_textport(
+                f"remote source {new_remote.name}")
             self.webClientDAT.par.url = new_remote.remote_inventory
             self.webClientDAT.par.request.pulse()
 
@@ -384,8 +411,6 @@ class PaletteExplorer:
                                     ...
                                 case _:
                                     pass
-
-                            print(toxVersion)
 
                         menuItems: list = [
                             'Show TOX Info', 'Upload Update']

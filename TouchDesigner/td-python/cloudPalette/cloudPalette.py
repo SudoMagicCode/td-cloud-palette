@@ -52,7 +52,7 @@ class PaletteExplorer:
 
         self._asset_tree_list = tdu.Dependency([])
 
-        self._local_cache: pathlib.Path = None
+        self._local_tox_cache: pathlib.Path = None
 
         self._setup()
 
@@ -65,8 +65,8 @@ class PaletteExplorer:
         return self._asset_tree_list
 
     @property
-    def Local_cache(self) -> str:
-        return self._local_cache
+    def Local_tox_cache(self) -> str:
+        return self._local_tox_cache
 
     def Get_treeLister_data(self) -> dict:
         data_dict = {}
@@ -83,14 +83,14 @@ class PaletteExplorer:
         self._query_cloud()
 
         # check for and build a local cache
-        self._check_local_cache()
+        self._check_local_tox_cache()
 
     def _query_cloud(self,) -> None:
         """
         """
         pass
 
-    def _check_local_cache(self) -> None:
+    def _check_local_tox_cache(self) -> None:
         derivative_folder = pathlib.Path(app.userPaletteFolder).parent
         cloud_palette_folder = pathlib.Path(
             f"{derivative_folder}/cloudPalette")
@@ -101,7 +101,7 @@ class PaletteExplorer:
                 f'creating directory {cloud_palette_folder}')
             os.makedirs(cloud_palette_folder)
 
-        self._local_cache = cloud_palette_folder
+        self._local_tox_cache = cloud_palette_folder
 
     def _gather_remote_sources(self):
         # empty remote sources
@@ -303,7 +303,7 @@ class PaletteExplorer:
         """
 
         OpBuffer = self._local_cache
-
+        print(OpBuffer)
         old_ops = OpBuffer.findChildren()
 
         for each_child in old_ops:

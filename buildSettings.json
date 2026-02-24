@@ -1,7 +1,8 @@
 {
     "BUILD": "TRUE",
-    "TD_VERSION": "2023.12230",
+    "TD_VERSION": "2025.32280",
     "PROJECT_FILE": "./TouchDesigner/project.toe",
-    "REPO": "https://github.com/SudoMagicCode/td-cloud-palette",
-    "COMP_NAME": "Cloud Palette"
+    "COMP_NAME": "Cloud Palette",
+    "BUILD_CONTENTS": "packageZip",
+    "USE_TDM": true
 }

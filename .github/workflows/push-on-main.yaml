@@ -18,24 +18,38 @@ jobs:
           submodules: true 
 
       - name: SudoMagic TD Package Builder
-        uses: SudoMagicCode/action-build-td-tox-package@v0.0.3
+        uses: SudoMagicCode/action-build-td-tox-package@v0.0.5
         with:
           build_settings: ./buildSettings.json
 
       - name: Generate Hybrid Version
         id: semver
         run: |
-          # PowerShell equivalent of the git logic
-          $LATEST_TAG = git describe --tags --abbrev=0 2>$null
-          if ($LASTEXITCODE -ne 0) { $LATEST_TAG = "v0.0" }
-
-          if ($LATEST_TAG -eq "v0.0") {
-            $COUNT = git rev-list --count HEAD
-          } else {
-            $COUNT = git rev-list --count "$LATEST_TAG..HEAD"
+          # This pattern matches v, digits, a literal dot, and digits. 
+          # It effectively blocks v1.0.1 because the * after the second number 
+          # would usually allow another dot, but we want to anchor strictly.
+          $BASE_TAG = git describe --tags --abbrev=0 --match "v[0-9]*.[0-9]*" --exclude "v*.*.*" 2>$null          
+          
+          if ($LASTEXITCODE -ne 0) { 
+            Write-Host "No base tag found, defaulting to v0.0"
+            $BASE_TAG = "v0.0" 
           }
 
-          $VERSION = "$LATEST_TAG.$COUNT"
+          # 2. Count commits since that base tag.
+          # If the current commit is the tag itself, COUNT will be 0.
+          if ($BASE_TAG -eq "v0.0") {
+            $COUNT = git rev-list --count HEAD
+          } else {
+            $COUNT = git rev-list --count "$($BASE_TAG)..HEAD"
+          }
+
+          # 3. Construct the hybrid VERSION (vX.Y.Z)
+          $VERSION = "$BASE_TAG.$COUNT"
+          
+          Write-Host "Base Tag: $BASE_TAG"
+          Write-Host "Commits since base: $COUNT"
+          Write-Host "Final Release Version: $VERSION"
+          
           echo "VERSION=$VERSION" >> $env:GITHUB_OUTPUT
           
       - name: Create Github Release

@@ -16,6 +16,11 @@
                     "type": "source",
                     "name": "Tools",
                     "link": "github.com/SudoMagicCode/sm-td-tools"
+                },
+                {
+                    "type": "source",
+                    "name": "POP Tools",
+                    "link": "github.com/SudoMagicCode/sm-td-pop-tools"
                 }
             ]
         }

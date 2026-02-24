@@ -23,14 +23,14 @@ class PaletteExplorer:
         self.log_decorator = "CLOUD PALETTE"
         self.decoratedLog = decoratedLog.DecoratedLog(
             logDecorator=self.log_decorator)
-        self.Remote_sources: list[remoteSources.RemoteSources] = []
+        self.Remote_sources: list[remoteSources.RemoteSource] = []
         self.remote_sources_map: dict = {}
 
         self._local_cache = myOp.op('base_cloud_palette_cache/base_empty')
 
         self.Remote_assets: dict = {}
-
         self.Remote_data: dict = []
+        self._inventory_data: dict = {}
 
         self.PaletteWindowCOMP = myOp.op('window_palette')
         self.PlacementWindowCOMP = myOp.op('window_placement')
@@ -77,6 +77,7 @@ class PaletteExplorer:
         # resets lister
         self._lister_COMP.par.Refresh.pulse()
 
+        self._load_inventory_from_file()
         self._gather_remote_sources()
 
         # refresh assets
@@ -89,6 +90,11 @@ class PaletteExplorer:
         """
         """
         pass
+
+    def _load_inventory_from_file(self) -> None:
+        self.decoratedLog.log_to_textport('importing cloud palette inventory')
+        with open(parent.cloudPalette.par.Inventory.eval(), 'r') as json_file:
+            self._inventory_data = json.load(json_file)
 
     def _check_local_tox_cache(self) -> None:
         derivative_folder = pathlib.Path(app.userPaletteFolder).parent
@@ -108,18 +114,25 @@ class PaletteExplorer:
         self.Remote_sources.clear()
         self.remote_sources_map.clear()
 
-        # rebuild remote sources based on contents
-        for each_block in parent.cloudPalette.seq.Remotesources.blocks:
-            new_remote = remoteSources.RemoteSources.sourceFromBlock(
-                each_block)
-            self.Remote_sources.append(new_remote)
-            self.remote_sources_map[new_remote.remote] = new_remote.name
+        sources = self._inventory_data.get('paletteElements')
 
-            # get remote data
-            self.decoratedLog.log_to_textport(
-                f"remote source {new_remote.name}")
-            self.webClientDAT.par.url = new_remote.remote_inventory
-            self.webClientDAT.par.request.pulse()
+        print('gathering remotes')
+
+        # rebuild remote sources based on contents
+        for each_collection in sources:
+            new_collection = remoteSources.InvioCollection.fromJson(
+                json=each_collection)
+            for each_source in new_collection.sources:
+                new_remote = remoteSources.RemoteSource.fromInvioSource(
+                    each_source)
+                self.Remote_sources.append(new_remote)
+                self.remote_sources_map[new_remote.remote] = new_remote.name
+
+                # get remote data
+                self.decoratedLog.log_to_textport(
+                    f"remote source {new_remote.name}")
+                self.webClientDAT.par.url = new_remote.remote_inventory
+                self.webClientDAT.par.request.pulse()
 
     def Refresh_inventory(self):
         self._set_ui_status('Refreshing Inventory')
@@ -471,7 +484,7 @@ class PaletteExplorer:
                     data=each_element, author=author, source=source, sourceMap=self.remote_sources_map)
                 self._asset_tree_list.val.append(new_row.as_list)
 
-    def _add_asset_tree_elements_from_table(self, author: str, tableSource: op) -> None:
+    def _add_asset_tree_elements_from_table(self, author: str, tableSource: OP) -> None:
         headers = tableSource.row(0)
 
         header_lookup_map = {

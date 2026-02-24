@@ -1,0 +1,51 @@
+name: Create TOX Release
+
+on:
+  push:
+    branches:
+      - main
+
+
+jobs:
+  Build_tox:
+    runs-on: [self-hosted, Windows, TouchDesigner]
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+          submodules: true 
+
+      - name: SudoMagic TD Package Builder
+        uses: SudoMagicCode/action-build-td-tox-package@v0.0.3
+        with:
+          build_settings: ./buildSettings.json
+
+      - name: Generate Hybrid Version
+        id: semver
+        run: |
+          # PowerShell equivalent of the git logic
+          $LATEST_TAG = git describe --tags --abbrev=0 2>$null
+          if ($LASTEXITCODE -ne 0) { $LATEST_TAG = "v0.0" }
+
+          if ($LATEST_TAG -eq "v0.0") {
+            $COUNT = git rev-list --count HEAD
+          } else {
+            $COUNT = git rev-list --count "$LATEST_TAG..HEAD"
+          }
+
+          $VERSION = "$LATEST_TAG.$COUNT"
+          echo "VERSION=$VERSION" >> $env:GITHUB_OUTPUT
+          
+      - name: Create Github Release
+        uses:  softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.semver.outputs.VERSION }}
+          name: Release ${{ steps.semver.outputs.VERSION }}
+          # Generates "What's Changed" section automatically from PRs/commits
+          generate_release_notes: true
+          # Set to true if you want it to stay hidden until you review it
+          draft: false 
+          prerelease: false
+          files: ./release/package.zip

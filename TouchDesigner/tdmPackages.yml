@@ -1,6 +1,6 @@
 name: "Cloud Palette"
-tdVersion: "2025.32050.Project"
+tdVersion: 2025.32280.Project
 tdPackages:
     - package: github.com/SudoMagicCode/td-comp-icon
-      releaseTag: v1.0.6
+      releaseTag: v1.2.8
 pythonRequirements: []

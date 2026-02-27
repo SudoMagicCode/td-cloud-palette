@@ -1,6 +1,5 @@
-from enum import Enum
-
-from cloudPaletteType import cloudPaletteTypes, cloudPaletteAsset
+from dataclasses import dataclass
+import cloudPaletteType
 
 header_map: dict[str, str] = {
     'name': 'display_name',
@@ -25,34 +24,54 @@ header_map: dict[str, str] = {
 }
 
 
+@dataclass
 class TreeListerRow:
-    def __init__(self):
-        self.cloudAsset: cloudPaletteAsset
+    root: str
+
+
+@dataclass
+class AssetRow(TreeListerRow):
+    cloudAsset: cloudPaletteType.cloudPaletteAsset
 
     @property
     def as_list(self) -> list:
         output_list = []
+
         for each in header_map.values():
-            output_list.append(getattr(self.cloudAsset, each))
+            val = getattr(self.cloudAsset, each)
+            output_list.append(val)
+
         return output_list
 
-    @staticmethod
-    def folder_row(data: dict):
-        newRow = TreeListerRow()
-        author: str = data.get('author')
-        block: str = data.get('block')
 
-        newRow.display_name = block if block != '' else author
-        newRow.lister_path = f'creator/{author}/{block}' if block != '' else f'creator/{author}'
-        newRow.assetType = cloudPaletteTypes.folder
+class FolderRow(TreeListerRow):
+    cloudAsset: cloudPaletteType.cloudPaletteCollection
 
-        return newRow
+    @property
+    def as_list(self) -> list:
+        return [
+            self.cloudAsset.sub_dir,
+            f'{self.cloudAsset.author}/{self.cloudAsset.sub_dir}',
+            self.cloudAsset.author,
+            False,
+            False,
+            None,
+            None,
+            cloudPaletteType.paletteType.folder.name,
+        ]
 
-    @staticmethod
-    def from_github_response_folder_row(*args):
-        newRow = TreeListerRow()
-        newRow.author = args[0]
-        newRow.display_name = args[-1]
-        newRow.lister_path = f"creator/{'/'.join([each for each in args])}"
-        newRow.assetType = cloudPaletteTypes.folder
-        return newRow
+
+class AuthorRow(TreeListerRow):
+
+    @property
+    def as_list(self) -> list:
+        return [
+            self.root,
+            self.root,
+            self.root,
+            False,
+            False,
+            None,
+            None,
+            cloudPaletteType.paletteType.folder.name,
+        ]

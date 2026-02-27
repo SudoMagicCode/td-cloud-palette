@@ -1,11 +1,13 @@
 import json
 import os
+import shutil
 import listerDataInterface
 import remoteSources
 import tdi
 import pathlib
 import downloader
 import decoratedLog
+import cloudPaletteType
 
 
 class PaletteExplorer:
@@ -24,7 +26,7 @@ class PaletteExplorer:
         self.Has_inventory = False
         self.remote_sources_map: dict = {}
         self.Remote_assets: dict = {}
-        self.Remote_data: dict = []
+        self.Remote_data: list[cloudPaletteType.cloudPaletteCollection] = []
         self._inventory_data: dict = {}
         self.Remote_sources: list[remoteSources.RemoteSource] = []
         self.current_tox_info: dict = {}
@@ -34,15 +36,16 @@ class PaletteExplorer:
         self.decoratedLog = decoratedLog.DecoratedLog(
             logDecorator=self.log_decorator)
 
-        self._local_cache = myOp.op('base_cloud_palette_cache/base_empty')
-        self.PaletteWindowCOMP = myOp.op('window_palette')
-        self.PlacementWindowCOMP = myOp.op('window_placement')
+        self._local_cache: baseCOMP = myOp.op(
+            'base_cloud_palette_cache/base_empty')
+        self.PaletteWindowCOMP: windowCOMP = myOp.op('window_palette')
+        self.PlacementWindowCOMP: windowCOMP = myOp.op('window_placement')
         self.CloudPalette_pop_menu_COMP = myOp.op('popMenu')
         self.Popup_tox_info_COMP = myOp.op('widget_popup_tox_info')
         self.Popup_tox_dl_COMP = myOp.op('widget_dl_info')
         self._td_palette_DAT = myOp.op('null_td_palette')
-        self.webClientDAT = myOp.op('webclient_palette')
-        self.asset_treeDAT = myOp.op('script_asset_tree')
+        self.webClientDAT: webclientDAT = myOp.op('webclient_palette')
+        self.asset_treeDAT: scriptDAT = myOp.op('script_asset_tree')
         self._lister_COMP = myOp.op(
             "container_treeLister_palette/container_body/container_palette/treeLister")
         self._search_text_COMP = myOp.op(
@@ -63,6 +66,9 @@ class PaletteExplorer:
     def Get_treeLister_data(self) -> dict:
         data_dict = {}
         return data_dict
+
+    def get_local_tox_path(self, localPath: str) -> str:
+        return f'{self.Local_tox_cache}/{localPath}'
 
     @property
     def user_cache_file(self) -> str:
@@ -109,20 +115,41 @@ class PaletteExplorer:
 
         self._load_user_cache_file()
 
+    def delete_cache(self) -> None:
+        cache_path = pathlib.Path(self.Local_tox_cache)
+        subdirs = [each for each in cache_path.iterdir() if each.is_dir()]
+
+        for each_subdir in subdirs:
+            shutil.rmtree(each_subdir)
+
     def Download_tox_files(self) -> None:
+        # cleanup old files
+        self.delete_cache()
+
+        # show popup to warn the user that we're downloading
         self.Popup_tox_dl_COMP.par.Openui.pulse()
+
+        # run our download process
         run(self._download_remote_tox_files, delayFrames=5)
 
     def _download_remote_tox_files(self) -> None:
         files_list: list[downloader.dl_target] = []
 
-        for each in []:
-            new_dl_target = downloader.dl_target(
-                name='', author='', path='', url='')
-            files_list.append(new_dl_target)
+        for each in self.Remote_data:
+            for each_asset in each.collection:
+                if each_asset.assetType == cloudPaletteType.paletteType.folder:
+                    pass
+                else:
+                    new_dl_target = downloader.dl_target(
+                        name=each_asset.display_name,
+                        author=each_asset.author,
+                        path=f'{self.Local_tox_cache}/{each_asset.asset_local_path}',
+                        url=each_asset.asset_url)
+
+                    files_list.append(new_dl_target)
 
         downloader.download(
-            urlList=files_list, targetOP=self.MyOp)
+            worker_info=files_list, targetOP=self.MyOp)
 
         self.Popup_tox_dl_COMP.par.Closeui.pulse()
 
@@ -166,8 +193,8 @@ class PaletteExplorer:
                 # get remote data
                 self.decoratedLog.log_to_textport(
                     f"remote source {new_remote.name}")
-                self.webClientDAT.par.url = new_remote.remote_inventory
-                self.webClientDAT.par.request.pulse()
+                self.webClientDAT.request(
+                    new_remote.remote_inventory, "GET")
 
     def Refresh_inventory(self):
         self._set_ui_status('Refreshing Inventory')
@@ -196,7 +223,9 @@ class PaletteExplorer:
                     case "json":
                         # NOTE KEEP TRACK HERE
                         data: dict = json.loads(data.decode())
-                        self.Remote_data.append(data)
+                        new_cloud_palette_collection = cloudPaletteType.cloudPaletteCollection.from_json(
+                            data, remoteSources=self.remote_sources_map)
+                        self.Remote_data.append(new_cloud_palette_collection)
                         self.asset_treeDAT.cook(force=True)
 
                     case "tox":
@@ -254,12 +283,13 @@ class PaletteExplorer:
         }
 
         if is_tox:
-            isLocal: bool = True if info.get('rowData').get(
-                'rowObject').get('isLocal') == 'True' else False
-            local_path: str = info.get(
-                'rowData').get('rowObject').get('local_asset_path')
+
+            local_path: str = self.get_local_tox_path(localPath=info.get(
+                'rowData').get('rowObject').get('local_asset_path'))
             remote_path: str = info.get(
                 'rowData').get('rowObject').get('asset_url')
+
+            isLocal: bool = os.path.isfile(local_path)
 
             load_info['safe_to_load'] = is_tox
             load_info['is_local'] = isLocal
@@ -351,7 +381,6 @@ class PaletteExplorer:
         '''
 
         OpBuffer = self._local_cache
-        print(OpBuffer)
         old_ops = OpBuffer.findChildren()
 
         for each_child in old_ops:
@@ -369,6 +398,7 @@ class PaletteExplorer:
         '''
         '''
         row: int = info.get('row')
+
         if row == -1:
             pass
         else:
@@ -377,6 +407,7 @@ class PaletteExplorer:
             if tox_info.get('safe_to_load'):
                 match tox_info.get('is_local'):
                     case True:
+                        self.current_tox_info = tox_info
                         self.GetLocalToxAsset(tox_info)
                     case _:
                         self.RequestRemoteToxAsset(tox_info)
@@ -506,26 +537,24 @@ class PaletteExplorer:
         '''
         '''
 
+        authors = set()
+
         for each in self.Remote_data:
 
-            # create row for author
-            author: str = each.get("author")
-            source = each.get("source")
+            authors.add(each.author)
+            new_folder_row = listerDataInterface.FolderRow(root=each.author)
+            new_folder_row.cloudAsset = each
+            self._asset_tree_list.val.append(new_folder_row.as_list)
 
-            author_row: listerDataInterface.TreeListerRow = listerDataInterface.TreeListerRow.from_github_response_folder_row(
-                author)
-            self._asset_tree_list.val.append(author_row.as_list)
+            for each_asset in each.collection:
+                new_lister_row = listerDataInterface.AssetRow(
+                    root=each.author, cloudAsset=each_asset)
 
-            # create row for any sub organizational element
-            sub_path_row: listerDataInterface.TreeListerRow = listerDataInterface.TreeListerRow.from_github_response_folder_row(
-                author, self.remote_sources_map.get(source))
-            self._asset_tree_list.val.append(sub_path_row.as_list)
+                self._asset_tree_list.val.append(new_lister_row.as_list)
 
-            # create rows for each item in collection
-            for each_element in each.get("collection", []):
-                new_row: listerDataInterface.TreeListerRow = listerDataInterface.TreeListerRow.from_github_response(
-                    data=each_element, author=author, source=source, sourceMap=self.remote_sources_map)
-                self._asset_tree_list.val.append(new_row.as_list)
+        for each_author in authors:
+            new_author_row = listerDataInterface.AuthorRow(root=each.author)
+            self._asset_tree_list.val.append(new_author_row.as_list)
 
     def _add_asset_tree_elements_from_table(self, author: str, tableSource: OP) -> None:
         '''

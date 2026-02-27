@@ -1,45 +1,56 @@
+from dataclasses import dataclass, field
 from enum import Enum
-from dataclasses import dataclass
 
 
-class cloudPaletteTypes(Enum):
+class paletteType(Enum):
     notYetAssigned = 'empty'
     folder = 'folder'
     tdComp = 'tdComp'
     tdTemplate = 'tdTemplate'
 
 
+class elementType(Enum):
+    asset = 'asset'
+    collection = 'collection'
+
+
 def _check_compatible(tdVersionString: str) -> bool:
     return tdVersionString != f'{app.version}.{app.build}'
 
 
-def _type_string_to_type(typeString: str) -> cloudPaletteTypes:
+def _type_string_to_type(typeString: str) -> paletteType:
     type_map = {
-        cloudPaletteTypes.tdTemplate.name: cloudPaletteTypes.tdTemplate,
-        cloudPaletteTypes.tdComp.name: cloudPaletteTypes.tdComp,
-        cloudPaletteTypes.folder.name: cloudPaletteTypes.folder,
-        cloudPaletteTypes.tdComp.name: cloudPaletteTypes.tdComp
+        paletteType.tdTemplate.name: paletteType.tdTemplate,
+        paletteType.tdComp.name: paletteType.tdComp,
+        paletteType.folder.name: paletteType.folder,
+        paletteType.tdComp.name: paletteType.tdComp
     }
-    return type_map.get(typeString, cloudPaletteTypes.notYetAssigned)
+    return type_map.get(typeString, paletteType.notYetAssigned)
 
 
 @dataclass
-class cloudPaletteAsset:
+class cloudPaletteElement:
+    author: str
+    source: str
+    elementType: elementType
 
-    display_name: str = ''
-    author: str = ''
-    lister_path: str = ''
-    is_tox: bool = False
+
+@dataclass
+class cloudPaletteAsset(cloudPaletteElement):
+    display_name: str
+    lister_path: str
+    asset_url: str
+    asset_local_path: str
+    tdVersion: str
+    toxVersion: str
+    lastSaved: str
+    is_tox: bool
+    assetType: paletteType = paletteType.notYetAssigned
     is_local: bool = False
-    asset_url: str = ''
-    asset_local_path: str = ''
-    assetType: cloudPaletteTypes = cloudPaletteTypes.notYetAssigned
-    tdVersion: str = ''
-    toxVersion: str = ''
-    lastSaved: str = ''
-    compatible: bool = None
-    opFamilies: list = []
-    opTypes: list = []
+    compatible: bool = False
+    elementType = elementType.asset
+    opFamilies: list = field(default_factory=list)
+    opTypes: list = field(default_factory=list)
 
     @property
     def has_COMPs(self) -> bool:
@@ -73,74 +84,80 @@ class cloudPaletteAsset:
     def asset_type(self) -> str:
         return self.assetType.name
 
-    @property
-    def is_tox(self) -> bool:
-        True if self.assetType in [
-            cloudPaletteTypes.tdComp, cloudPaletteTypes.tdTemplate] else False
-
     @staticmethod
-    def from_api_response(data: dict):
-        # create new row
-        newPaletteAsset = cloudPaletteAsset()
-
-        # pull data from incoming object
-        td_version: str = data.get('asset_data').get('td_version', 'Unknown')
-        tox_version: str = data.get('asset_data').get('tox_version', 'Unknown')
-        author: str = data.get('author', '')
-        block: str = data.get('block', '')
-        asset_path: str = data.get('asset_data').get('asset_path', '')
-        asset_name: str = data.get('asset_data').get('display_name', 'Unnamed')
-        type_string: str = data.get('asset_data').get('type')
-        last_saved: str = data.get('asset_data').get('last_updated', 'Unknown')
-        op_families: list = data.get('asset_data').get('opFamilies', [])
-        op_types: list = data.get('asset_data').get('opTypes', [])
-        base_uri: str = data.get('base_uri', '')
-
-        # assign attributes to newRow object
-        newPaletteAsset.display_name = asset_name
-        newPaletteAsset.author = author
-        newPaletteAsset.lister_path = f'creator/{author}/{block}/{asset_name}'
-        newPaletteAsset.is_local = False
-        newPaletteAsset.asset_url = f'{base_uri}latest/{asset_path}'
-        newPaletteAsset.assetType = _type_string_to_type(type_string)
-        newPaletteAsset.tdVersion = td_version
-        newPaletteAsset.toxVersion = tox_version
-        newPaletteAsset.lastSaved = last_saved
-        newPaletteAsset.compatible = _check_compatible(td_version)
-        newPaletteAsset.opFamilies = op_families
-        newPaletteAsset.opTypes = op_types
-        return newPaletteAsset
-
-    @staticmethod
-    def from_github_response(data: dict, author: str, source: str, sourceMap: dict):
-        newAsset = cloudPaletteAsset
-        sub_path: str = sourceMap.get(source)
+    def from_github_response(data: dict, author: str, source: str, subDir: str):
 
         raw_name: str = data.get("display_name", "unknown")
+        raw_asset_path: str = data.get("asset_path")
+        raw_lister_path: str = data.get("path", "unknown")
+
+        asset_path_elements = raw_asset_path.split('/')
+
         asset_name: str = raw_name.replace('\n', ' ')
-        lister_path: str = data.get("path", "unknown")
+        lister_path: str = raw_lister_path.replace('\n', ' ')
         asset_path: str = "" if data.get(
-            "asset_path") == None else f'https://{source}/releases/latest/download/{data.get("asset_path")}'
+            "asset_path") == None else f'https://{source}/releases/latest/download/{raw_asset_path}'
         td_version: str = data.get("td_version", "")
         tox_version: str = data.get("tox_version", "")
         last_saved: str = data.get("last_updated", "")
-        opFam: list = data.get("opFamilies", [])
-        opTypes: list = data.get("opTypes", [])
+        op_fam: list = data.get("opFamilies", [])
+        op_types: list = data.get("opTypes", [])
         asset_type = _type_string_to_type(data.get("type"))
-        isCompatible = None if asset_type == cloudPaletteTypes.folder else _check_compatible(
+        is_compatible = None if asset_type == paletteType.folder else _check_compatible(
             td_version)
+        l_path = f"{author}/{subDir}/{lister_path}"
+        path_on_disk = f"{'/'.join(l_path.split('/')[:-1])}/{asset_path_elements[-1]}"
+
+        isTox = True if asset_type in [
+            paletteType.tdComp, paletteType.tdTemplate] else False
 
         # assign attributes to newRow object
-        newAsset.display_name = asset_name
-        newAsset.author = author
-        newAsset.lister_path = f"creator/{author}/{sub_path}/{lister_path}"
-        newAsset.is_local = False
-        newAsset.asset_url = asset_path
-        newAsset.assetType = asset_type
-        newAsset.tdVersion = td_version
-        newAsset.toxVersion = tox_version
-        newAsset.lastSaved = last_saved
-        newAsset.compatible = isCompatible
-        newAsset.opFamilies = opFam
-        newAsset.opTypes = opTypes
+        newAsset = cloudPaletteAsset(
+            source=source,
+            author=author,
+            elementType=elementType.asset,
+            display_name=asset_name,
+            lister_path=l_path,
+            asset_local_path=path_on_disk,
+            is_local=False,
+            is_tox=isTox,
+            asset_url=asset_path,
+            assetType=asset_type,
+            tdVersion=td_version,
+            toxVersion=tox_version,
+            lastSaved=last_saved,
+            compatible=is_compatible,
+            opFamilies=op_fam,
+            opTypes=op_types
+        )
+
         return newAsset
+
+
+@dataclass
+class cloudPaletteCollection(cloudPaletteElement):
+    sub_dir: str
+    elementType = elementType.collection
+    collection: list[cloudPaletteAsset] = field(default_factory=list)
+
+    @staticmethod
+    def from_json(info: dict, remoteSources: dict):
+        author = info.get('author', 'unknown')
+        source = info.get('source', 'unknown')
+        elements: list[cloudPaletteAsset] = []
+        sub_dir = remoteSources.get(source, '')
+
+        for each in info.get('collection', []):
+            new_cloud_palette_asset = cloudPaletteAsset.from_github_response(
+                data=each, author=author, source=source, subDir=sub_dir)
+
+            elements.append(new_cloud_palette_asset)
+
+        new_collection = cloudPaletteCollection(
+            elementType=elementType.collection,
+            sub_dir=sub_dir,
+            author=author,
+            source=source,
+            collection=elements)
+
+        return new_collection

@@ -1,4 +1,4 @@
-from cloudPaletteType import cloudPaletteTypes
+from cloudPaletteType import paletteType
 from dataclasses import dataclass
 
 
@@ -8,7 +8,7 @@ class remoteTox:
 
     path: str = ""
     summary: str = ""
-    type_tag: cloudPaletteTypes = cloudPaletteTypes.notYetAssigned
+    type_tag: paletteType = paletteType.notYetAssigned
     display_name: str = ""
     tox_version: str = ""
     td_version: str = ""

@@ -1,9 +1,7 @@
-import threading
 import os
-import time
 import decoratedLog
+from pathlib import Path
 from requests import get
-from queue import Queue
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 
@@ -27,7 +25,10 @@ def _download(info: dl_target) -> None:
     if os.path.exists(info.path):
         pass
     else:
-        with open(info.path, "wb") as f:
+        file_path = Path(info.path)
+        file_path.parent.mkdir(parents=True, exist_ok=True)
+
+        with open(info.path, "wb", ) as f:
             for chunk in new_get_request.iter_content(chunk_size=8192):
                 f.write(chunk)
 

@@ -1,0 +1,18 @@
+{
+    "name": "SM Palette",
+    "author": "Matthew Ragan",
+    "version": "v1.0.0",
+    "paletteElements": [
+        {
+            "type": "collection",
+            "name": "SudoMagic",
+            "sources": [
+                {
+                    "type": "source",
+                    "name": "POP Tools",
+                    "link": "github.com/SudoMagicCode/sm-td-pop-tools"
+                }
+            ]
+        }
+    ]
+}

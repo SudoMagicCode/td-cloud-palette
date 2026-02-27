@@ -20,6 +20,7 @@ class PaletteExplorer:
 
         self.__repr__ = 'Class <PaletteExplorer>'
         self.MyOp = myOp
+        self.opShell: baseCOMP = myOp.parent()
 
         self.log_decorator = "CLOUD PALETTE"
         self.inventory_blocks = []
@@ -76,6 +77,8 @@ class PaletteExplorer:
 
     def _setup(self) -> None:
         """All set-up procedures for UI"""
+        self.opShell.par.Localcache = ''
+
         # resets lister
         self._lister_COMP.par.Refresh.pulse()
 
@@ -170,6 +173,7 @@ class PaletteExplorer:
             os.makedirs(cloud_palette_folder)
 
         self._local_tox_cache = cloud_palette_folder
+        self.opShell.par.Localcache = cloud_palette_folder
 
     def _gather_remote_sources(self):
         # empty remote sources

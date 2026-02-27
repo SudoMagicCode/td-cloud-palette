@@ -1,9 +1,12 @@
+from dataclasses import dataclass
 
+
+@dataclass
 class githubCollection:
     def __init__(self):
-        self.author: str = None
-        self.source: str = None
-        self.collection: list = []
+        self.author: str
+        self.source: str
+        self.collection: list
 
     def to_dict(self) -> dict:
         '''returns a dictionary shaped object of the collection

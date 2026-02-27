@@ -2,26 +2,27 @@ from enum import Enum
 
 from cloudPaletteType import cloudPaletteTypes
 
-header_row = [
-    'name',
-    'path',
-    'isTOX',
-    'isLocal',
-    'local_asset_path',
-    'asset_url',
-    'assetType',
-    'TDVersion',
-    'TOXVersion',
-    'lastSaved',
-    'warn',
-    'hasCOMPs',
-    'hasTOPs',
-    'hasCHOPs',
-    'hasSOPs',
-    'hasPOPs',
-    'hasMATs',
-    'hasDATs'
-]
+header_map: dict[str, str] = {
+    'name': 'display_name',
+    'path': 'lister_path',
+    'author': 'author',
+    'isTOX': 'is_tox',
+    'isLocal': 'is_local',
+    'asset_url': 'asset_url',
+    'local_asset_path': 'asset_local_path',
+    'assetType': 'asset_type',
+    'TDVersion': 'tdVersion',
+    'TOXVersion': 'toxVersion',
+    'lastSaved': 'lastSaved',
+    'warn': 'compatible',
+    'hasCOMPs': 'has_COMPs',
+    'hasTOPs': 'has_TOPs',
+    'hasCHOPs': 'has_CHOPs',
+    'hasSOPs': 'has_SOPs',
+    'hasPOPs': 'has_POPs',
+    'hasMATs': 'has_MATs',
+    'hasDATs': 'has_DATs',
+}
 
 
 def _type_string_to_type(typeString: str) -> cloudPaletteTypes:
@@ -41,6 +42,7 @@ def _check_compatible(tdVersionString: str) -> bool:
 class TreeListerRow:
     def __init__(self):
         self.display_name: str = ''
+        self.author: str = ''
         self.lister_path: str = ''
         self.is_tox: bool = False
         self.is_local: bool = False
@@ -83,28 +85,15 @@ class TreeListerRow:
         return 'DAT' in self.opFamilies
 
     @property
+    def asset_type(self) -> str:
+        return self.assetType.name
+
+    @property
     def as_list(self) -> list:
-        row_list = [
-            self.display_name,
-            self.lister_path,
-            self.is_tox,
-            self.is_local,
-            self.asset_local_path,
-            self.asset_url,
-            self.assetType.name,
-            self.tdVersion,
-            self.toxVersion,
-            self.lastSaved,
-            self.compatible,
-            self.has_COMPs,
-            self.has_TOPs,
-            self.has_CHOPs,
-            self.has_SOPs,
-            self.has_POPs,
-            self.has_MATs,
-            self.has_DATs
-        ]
-        return row_list
+        output_list = []
+        for each in header_map.values():
+            output_list.append(getattr(self, each))
+        return output_list
 
     @staticmethod
     def from_api_response(data: dict):
@@ -129,6 +118,7 @@ class TreeListerRow:
 
         # assign attributes to newRow object
         newRow.display_name = asset_name
+        newRow.author = author
         newRow.lister_path = f'creator/{author}/{block}/{asset_name}'
         newRow.is_tox = True
         newRow.is_local = False
@@ -198,6 +188,7 @@ class TreeListerRow:
     @staticmethod
     def from_github_response_folder_row(*args):
         newRow = TreeListerRow()
+        newRow.author = args[0]
         newRow.display_name = args[-1]
         newRow.lister_path = f"creator/{'/'.join([each for each in args])}"
         newRow.assetType = cloudPaletteTypes.folder
@@ -208,7 +199,9 @@ class TreeListerRow:
         newRow = TreeListerRow()
         sub_path: str = sourceMap.get(source)
 
-        asset_name: str = data.get("display_name", "unknown")
+        raw_name: str = data.get("display_name", "unknown")
+
+        asset_name: str = raw_name.replace('\n', ' ')
         lister_path: str = data.get("path", "unknown")
         asset_path: str = "" if data.get(
             "asset_path") == None else f'https://{source}/releases/latest/download/{data.get("asset_path")}'
@@ -224,12 +217,14 @@ class TreeListerRow:
             "opTypes", []) == None else data.get("opTypes", [])
 
         asset_type = _type_string_to_type(data.get("type"))
-        isCompatible: bool = _check_compatible(td_version)
+        isCompatible = None if asset_type == cloudPaletteTypes.folder else _check_compatible(
+            td_version)
         is_tox = True if asset_type in [
             cloudPaletteTypes.tdComp, cloudPaletteTypes.tdTemplate] else False
 
         # assign attributes to newRow object
         newRow.display_name = asset_name
+        newRow.author = author
         newRow.lister_path = f"creator/{author}/{sub_path}/{lister_path}"
         newRow.is_tox = is_tox
         newRow.is_local = False

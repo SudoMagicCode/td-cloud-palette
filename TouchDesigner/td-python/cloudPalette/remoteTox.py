@@ -1,21 +1,21 @@
 from cloudPaletteType import cloudPaletteTypes
+from dataclasses import dataclass
 
 
 class remoteTox:
     '''A Remote TOX object - data struct for moving around remote objects
     '''
 
-    def __init__(self):
-        self.path: str = ""
-        self.summary: str = ""
-        self.type_tag: cloudPaletteTypes = cloudPaletteTypes.notYetAssigned
-        self.display_name: str = ""
-        self.tox_version: str = ""
-        self.td_version: str = ""
-        self.last_updated: str = ""
-        self.asset_path: str = ""
-        self.opFamilies: list = []
-        self.opTypes: list = []
+    path: str = ""
+    summary: str = ""
+    type_tag: cloudPaletteTypes = cloudPaletteTypes.notYetAssigned
+    display_name: str = ""
+    tox_version: str = ""
+    td_version: str = ""
+    last_updated: str = ""
+    asset_path: str = ""
+    opFamilies: list = []
+    opTypes: list = []
 
     def to_dict(self) -> dict:
         '''Dictionary representation of remoteTox object

@@ -47,6 +47,7 @@ class RemoteSource:
     '''
     name: str
     remote: str
+    author: str
 
     @property
     def remote_inventory(self) -> str:
@@ -59,4 +60,5 @@ class RemoteSource:
     def fromInvioSource(source: InvioSource):
         name: str = source.name
         remote: str = source.link
-        return RemoteSource(name=name, remote=remote)
+        author: str = remote.split('/')[1]
+        return RemoteSource(name=name, remote=remote, author=author)

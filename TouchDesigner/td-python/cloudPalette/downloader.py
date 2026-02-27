@@ -2,35 +2,37 @@ import threading
 import os
 import time
 import decoratedLog
-#from requests import get
+from requests import get
 from queue import Queue
+from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass
 
 downloadLog = decoratedLog.DecoratedLog("- Threaded Downloader -")
 
 MAX_WORKERS = 10
 
 
-def _download(url: str, rootDir: str, queue: Queue) -> None:
-    queue.put("Working")
-
-    new_get_request = get(url, stream=True, timeout=10)
-    name = url.split("/")[-1]
-    fileName: str = f"{rootDir}/{name}"
-
-    with open(fileName, "wb") as f:
-        for chunk in new_get_request.iter_content(chunk_size=8192):
-            f.write(chunk)
-
-    queue.put("Ready")
+@dataclass
+class dl_target:
+    url: str
+    path: str
+    name: str
+    author: str
 
 
-def download(urlList: list[str], rootDir: str, targetOP) -> None:
-    task_queue = Queue()
-    workers = []
-    targetOP.store("workers", workers)
+def _download(info: dl_target) -> None:
 
-    for each in range(MAX_WORKERS):
-        worker_thread = threading.Thread(
-            target=_download, args=(urlList[each], rootDir, task_queue))
-        worker_thread.start()
-        workers.append(worker_thread)
+    new_get_request = get(info.url, stream=True, timeout=10)
+
+    if os.path.exists(info.path):
+        pass
+    else:
+        with open(info.path, "wb") as f:
+            for chunk in new_get_request.iter_content(chunk_size=8192):
+                f.write(chunk)
+
+
+def download(worker_info: list[dl_target], targetOP: OP) -> None:
+
+    with ThreadPoolExecutor(max_workers=5) as worker:
+        results = list(worker.map(_download, worker_info))

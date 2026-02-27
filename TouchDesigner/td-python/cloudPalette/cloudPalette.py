@@ -9,12 +9,13 @@ import decoratedLog
 
 
 class PaletteExplorer:
-    """
-    """
+    '''
+    '''
 
     def __init__(self, myOp: tdi.baseCOMP):
-        """
-        """
+        '''
+        '''
+
         self.__repr__ = 'Class <PaletteExplorer>'
         self.MyOp = myOp
 
@@ -36,6 +37,7 @@ class PaletteExplorer:
         self.PlacementWindowCOMP = myOp.op('window_placement')
         self.CloudPalette_pop_menu_COMP = myOp.op('popMenu')
         self.Popup_tox_info_COMP = myOp.op('widget_popup_tox_info')
+        self.Popup_tox_dl_COMP = myOp.op('widget_dl_info')
 
         self._td_palette_DAT = myOp.op('null_td_palette')
 
@@ -72,29 +74,72 @@ class PaletteExplorer:
         data_dict = {}
         return data_dict
 
+    @property
+    def user_cache_file(self) -> str:
+        return f'{self.Local_tox_cache}/userCache.json'
+
     def _setup(self) -> None:
         """All set-up procedures for UI"""
         # resets lister
         self._lister_COMP.par.Refresh.pulse()
 
-        self._load_inventory_from_file()
+        # check for and build a local cache
+        self._check_local_tox_cache()
+
+        self._check_cache_file()
+
+    def _query_cloud(self,) -> None:
+        '''
+        '''
+        pass
+
+    def _check_cache_file(self) -> None:
+        if os.path.exists(self.user_cache_file):
+            self._load_user_cache_file()
+
+    def _load_user_cache_file(self) -> None:
+
+        with open(self.user_cache_file, 'r') as json_file:
+            self._inventory_data = json.load(json_file)
+
         self._gather_remote_sources()
 
         # refresh assets
         self._query_cloud()
 
-        # check for and build a local cache
-        self._check_local_tox_cache()
-
-    def _query_cloud(self,) -> None:
-        """
-        """
-        pass
-
-    def _load_inventory_from_file(self) -> None:
+    def Load_inventory(self) -> None:
         self.decoratedLog.log_to_textport('importing cloud palette inventory')
-        with open(parent.cloudPalette.par.Inventory.eval(), 'r') as json_file:
-            self._inventory_data = json.load(json_file)
+
+        inventory_file = ui.chooseFile(
+            title="Select an Inventory", fileTypes=['json'])
+
+        with open(self.user_cache_file, 'w') as destination, open(inventory_file, 'r') as source:
+            content = source.read()
+            destination.write(content)
+
+        self._load_user_cache_file()
+
+    def Download_tox_files(self) -> None:
+        self.Popup_tox_dl_COMP.par.Openui.pulse()
+        run(self._download_remote_tox_files, delayFrames=5)
+
+    def _download_remote_tox_files(self) -> None:
+        files_list: list[downloader.dl_target] = []
+
+        for each in []:
+            new_dl_target = downloader.dl_target(
+                name='', author='', path='', url='')
+            files_list.append(new_dl_target)
+
+        downloader.download(
+            urlList=files_list, targetOP=self.MyOp)
+
+        self.Popup_tox_dl_COMP.par.Closeui.pulse()
+
+    def _dump_remote_data(self) -> None:
+        with open(f'{self.Local_tox_cache}/cloudPaletteData.json', 'w') as cloudPaletteFile:
+            data = json.dumps(self.Remote_data, indent=4)
+            cloudPaletteFile.write(data)
 
     def _check_local_tox_cache(self) -> None:
         derivative_folder = pathlib.Path(app.userPaletteFolder).parent
@@ -139,8 +184,8 @@ class PaletteExplorer:
         self._query_cloud()
 
     def Parse_cloud_response(self, data, headerDict: dict):
-        """
-        """
+        '''
+        '''
         match headerDict.get('content-type'):
             case 'binary/octet-stream':
                 # we've downloaded a tox
@@ -175,8 +220,8 @@ class PaletteExplorer:
                 pass
 
     def PaletteWindow(self, state) -> None:
-        """
-        """
+        '''
+        '''
 
         if state:
             # start with a fresh search filter
@@ -190,8 +235,8 @@ class PaletteExplorer:
         pass
 
     def PlacementWindow(self, state) -> None:
-        """
-        """
+        '''
+        '''
         if state:
             self.PlacementWindowCOMP.par.winopen.pulse()
         else:
@@ -200,8 +245,8 @@ class PaletteExplorer:
         pass
 
     def FindToxToLoad(self, info: dict) -> dict:
-        """
-        """
+        '''
+        '''
         row = info.get('row')
         col = info.get('col')
         TOXPath = None
@@ -244,20 +289,20 @@ class PaletteExplorer:
             return load_info
 
     def GetCurrentNetworkLocation(self) -> callable:
-        """
-        """
+        '''
+        '''
         currentPane = ui.panes[ui.panes.current]
         networkPath = currentPane.owner
         return networkPath
 
     def GetCurrentPane(self) -> callable:
-        """
-        """
+        '''
+        '''
         return ui.panes[ui.panes.current]
 
     def RequestRemoteToxAsset(self, tox_info: dict) -> None:
-        """
-        """
+        '''
+        '''
         # request TOX with web client DAT
         self.webClientDAT.par.url = tox_info.get('remote_path')
         self.webClientDAT.par.request.pulse()
@@ -274,8 +319,8 @@ class PaletteExplorer:
             from_bytes: bool = False,
             file_path: str = '',
             request_response: bytes = None) -> None:
-        """
-        """
+        '''
+        '''
         tox_info = self.current_tox_info
 
         OpBuffer = self.OpBufferCreate()
@@ -312,8 +357,8 @@ class PaletteExplorer:
         pass
 
     def OpBufferCreate(self) -> callable:
-        """
-        """
+        '''
+        '''
 
         OpBuffer = self._local_cache
         print(OpBuffer)
@@ -325,14 +370,14 @@ class PaletteExplorer:
         return OpBuffer
 
     def OpBufferDestroy(self, OpBuffer) -> None:
-        """
-        """
+        '''
+        '''
         OpBuffer.destroy()
         pass
 
     def PlacePaletteTox(self, info: dict) -> None:
-        """
-        """
+        '''
+        '''
         row: int = info.get('row')
         if row == -1:
             pass
@@ -350,18 +395,13 @@ class PaletteExplorer:
             pass
 
     def Open_palette(self) -> None:
-        """
-        """
+        '''
+        '''
         parent.tool.PaletteWindow(True)
-        # privacy = self.check_privacy()
-        # if privacy:
-        # parent.tool.PaletteWindow(True)
-        # else:
-        # self.prompt_password()
 
     def check_privacy(self) -> bool:
-        """
-        """
+        '''
+        '''
         # check to see comp privacy is active
         is_private = self.MyOp.par.Compsource.eval().isPrivate
         privacy_active = self.MyOp.par.Compsource.eval().isPrivacyActive
@@ -372,10 +412,10 @@ class PaletteExplorer:
             return False
 
     def get_item_from_row_index(self, index: int) -> dict:
+        '''
+        '''
         info = {}
-
         info['asset_tree_row':self.asset_treeDAT.row(index)]
-
         return info
 
     def On_lister_right_click(self, info: dict) -> None:
@@ -426,7 +466,7 @@ class PaletteExplorer:
                                     pass
 
                         menuItems: list = [
-                            'Show TOX Info', 'Upload Update']
+                            'Show TOX Info']
 
                         self.CloudPalette_pop_menu_COMP.Open(
                             items=menuItems,
@@ -446,13 +486,19 @@ class PaletteExplorer:
         self.MyOp.op('iparUiKit').par.Searchstring = ''
 
     def _set_ui_status(self, msg: str) -> None:
+        '''
+        '''
         ui.status = f'{self.log_decorator} | {msg}'
 
     @property
     def Build_lister_asset_tree(self) -> list:
+        '''
+        '''
+
         # clear asset tree list
         self._asset_tree_list = tdu.Dependency([])
-        self._asset_tree_list.val.append(listerDataInterface.header_row)
+        self._asset_tree_list.val.append(
+            [each for each in listerDataInterface.header_map.keys()])
 
         # add all elements from remotes
         self._add_asset_tree_elements_from_remotes()
@@ -463,15 +509,22 @@ class PaletteExplorer:
 
         return self._asset_tree_list
 
+    def _get_toxes_from_remote_data(self) -> list:
+        ...
+
     def _add_asset_tree_elements_from_remotes(self) -> None:
+        '''
+        '''
+
         for each in self.Remote_data:
 
             # create row for author
             author: str = each.get("author")
+            source = each.get("source")
+
             author_row: listerDataInterface.TreeListerRow = listerDataInterface.TreeListerRow.from_github_response_folder_row(
                 author)
             self._asset_tree_list.val.append(author_row.as_list)
-            source = each.get("source")
 
             # create row for any sub organizational element
             sub_path_row: listerDataInterface.TreeListerRow = listerDataInterface.TreeListerRow.from_github_response_folder_row(
@@ -485,6 +538,9 @@ class PaletteExplorer:
                 self._asset_tree_list.val.append(new_row.as_list)
 
     def _add_asset_tree_elements_from_table(self, author: str, tableSource: OP) -> None:
+        '''
+        '''
+
         headers = tableSource.row(0)
 
         header_lookup_map = {

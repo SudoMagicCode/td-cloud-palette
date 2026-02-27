@@ -19,48 +19,38 @@ class PaletteExplorer:
         self.__repr__ = 'Class <PaletteExplorer>'
         self.MyOp = myOp
 
+        self.log_decorator = "CLOUD PALETTE"
         self.inventory_blocks = []
         self.Has_inventory = False
-        self.log_decorator = "CLOUD PALETTE"
-        self.decoratedLog = decoratedLog.DecoratedLog(
-            logDecorator=self.log_decorator)
-        self.Remote_sources: list[remoteSources.RemoteSource] = []
         self.remote_sources_map: dict = {}
-
-        self._local_cache = myOp.op('base_cloud_palette_cache/base_empty')
-
         self.Remote_assets: dict = {}
         self.Remote_data: dict = []
         self._inventory_data: dict = {}
+        self.Remote_sources: list[remoteSources.RemoteSource] = []
+        self.current_tox_info: dict = {}
+        self._local_tox_cache: pathlib.Path = None
+        self._asset_tree_list = tdu.Dependency([])
 
+        self.decoratedLog = decoratedLog.DecoratedLog(
+            logDecorator=self.log_decorator)
+
+        self._local_cache = myOp.op('base_cloud_palette_cache/base_empty')
         self.PaletteWindowCOMP = myOp.op('window_palette')
         self.PlacementWindowCOMP = myOp.op('window_placement')
         self.CloudPalette_pop_menu_COMP = myOp.op('popMenu')
         self.Popup_tox_info_COMP = myOp.op('widget_popup_tox_info')
         self.Popup_tox_dl_COMP = myOp.op('widget_dl_info')
-
         self._td_palette_DAT = myOp.op('null_td_palette')
-
         self.webClientDAT = myOp.op('webclient_palette')
         self.asset_treeDAT = myOp.op('script_asset_tree')
-
         self._lister_COMP = myOp.op(
             "container_treeLister_palette/container_body/container_palette/treeLister")
-
         self._search_text_COMP = myOp.op(
             "container_tree_lister/container_body/container_palette/container_search/text_search")
-
-        self.current_tox_info: dict = {}
-
-        self._asset_tree_list = tdu.Dependency([])
-
-        self._local_tox_cache: pathlib.Path = None
 
         self._setup()
 
         self.decoratedLog.log_to_textport(f'PaletteExplorer init from {myOp}')
-
-        pass
 
     @property
     def Asset_tree_list(self) -> list:

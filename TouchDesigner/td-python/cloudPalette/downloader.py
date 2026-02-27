@@ -1,9 +1,6 @@
-import threading
 import os
-import time
 import decoratedLog
 from requests import get
-from queue import Queue
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 

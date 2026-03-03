@@ -1,4 +1,7 @@
 from dataclasses import dataclass
+import cloudPaletteType
+
+# Strict translation layer from web app that outputs invio files
 
 
 @dataclass
@@ -39,6 +42,8 @@ class InvioCollection:
 
         return newCollection
 
+# data layer useful to cloud palette
+
 
 @dataclass
 class RemoteSource:
@@ -48,6 +53,7 @@ class RemoteSource:
     name: str
     remote: str
     author: str
+    paletteCollection: cloudPaletteType.cloudPaletteCollection = None
 
     @property
     def remote_inventory(self) -> str:
@@ -62,3 +68,27 @@ class RemoteSource:
         remote: str = source.link
         author: str = remote.split('/')[1]
         return RemoteSource(name=name, remote=remote, author=author)
+
+
+@dataclass
+class RemoteCollection:
+    name: str
+    sources: list[RemoteSource]
+
+    def __repr__(self) -> str:
+        return 'Class <RemoteCollection>'
+
+    @staticmethod
+    def fromInvioCollection(invio: InvioCollection):
+        print("------------- > creating collection")
+        remoteSources = []
+        name: str = invio.name
+
+        for each in invio.sources:
+            newSource: RemoteSource = RemoteSource.fromInvioSource(each)
+            remoteSources.append(newSource)
+
+        newCollection = InvioCollection(
+            name=name, sources=remoteSources)
+
+        return newCollection

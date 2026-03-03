@@ -51,7 +51,7 @@ class FolderRow(TreeListerRow):
     def as_list(self) -> list:
         return [
             self.cloudAsset.sub_dir,
-            f'{self.cloudAsset.author}/{self.cloudAsset.sub_dir}',
+            f'{self.root}/{self.cloudAsset.sub_dir}',
             self.cloudAsset.author,
             False,
             False,

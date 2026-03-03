@@ -9,6 +9,10 @@ import downloader
 import decoratedLog
 import cloudPaletteType
 
+CLOUD_PALETTE: str = 'cloudPalette.json'
+CLOUD_PALETTE_LOCK: str = 'cloudPalette.lock'
+LAST_CACHE: str = 'userInventory.json'
+
 
 class PaletteExplorer:
     '''
@@ -23,19 +27,24 @@ class PaletteExplorer:
         self.opShell: baseCOMP = myOp.parent()
 
         self.log_decorator = "CLOUD PALETTE"
+        self.decoratedLog = decoratedLog.DecoratedLog(
+            logDecorator=self.log_decorator)
+
         self.inventory_blocks = []
         self.Has_inventory = False
-        self.remote_sources_map: dict = {}
+        self.current_tox_info: dict = {}
+        self._local_tox_cache: pathlib.Path = None
+
+        # Data structures for remote data
+        self.remote_collections: list[remoteSources.RemoteCollection] = []
+
         self.Remote_assets: dict = {}
         self.Remote_data: list[cloudPaletteType.cloudPaletteCollection] = []
         self._inventory_data: dict = {}
         self.Remote_sources: list[remoteSources.RemoteSource] = []
-        self.current_tox_info: dict = {}
-        self._local_tox_cache: pathlib.Path = None
-        self._asset_tree_list = tdu.Dependency([])
+        self.remote_sources_map: dict = {}
 
-        self.decoratedLog = decoratedLog.DecoratedLog(
-            logDecorator=self.log_decorator)
+        self._asset_tree_list = tdu.Dependency([])
 
         self._local_cache: baseCOMP = myOp.op(
             'base_cloud_palette_cache/base_empty')
@@ -73,7 +82,15 @@ class PaletteExplorer:
 
     @property
     def user_cache_file(self) -> str:
-        return f'{self.Local_tox_cache}/userCache.json'
+        return f'{self.Local_tox_cache}/{LAST_CACHE}'
+
+    @property
+    def palette_file(self) -> str:
+        return f'{self.Local_tox_cache}/{CLOUD_PALETTE}'
+
+    @property
+    def palette_lock_file(self) -> str:
+        return f'{self.Local_tox_cache}/{CLOUD_PALETTE_LOCK}'
 
     def _setup(self) -> None:
         """All set-up procedures for UI"""
@@ -107,16 +124,23 @@ class PaletteExplorer:
         self._query_cloud()
 
     def Load_inventory(self) -> None:
-        self.decoratedLog.log_to_textport('importing cloud palette inventory')
+        self.decoratedLog.log_to_textport('Importing cloud palette inventory')
 
+        # user selects file
         inventory_file = ui.chooseFile(
             title="Select an Inventory", fileTypes=['json'])
 
+        # overwrite existing cache file with user selection
         with open(self.user_cache_file, 'w') as destination, open(inventory_file, 'r') as source:
             content = source.read()
             destination.write(content)
 
+        # load newly overwritten file
         self._load_user_cache_file()
+
+    def Delete_local_cache(self) -> None:
+        self.decoratedLog.log_to_textport('Deleting local cache files')
+        self.delete_cache()
 
     def delete_cache(self) -> None:
         cache_path = pathlib.Path(self.Local_tox_cache)
@@ -177,6 +201,7 @@ class PaletteExplorer:
 
     def _gather_remote_sources(self):
         # empty remote sources
+        self.remote_collections.clear()
         self.Remote_sources.clear()
         self.remote_sources_map.clear()
 
@@ -186,12 +211,19 @@ class PaletteExplorer:
 
         # rebuild remote sources based on contents
         for each_collection in sources:
-            new_collection = remoteSources.InvioCollection.fromJson(
+            new_invio_collection = remoteSources.InvioCollection.fromJson(
                 json=each_collection)
-            for each_source in new_collection.sources:
+            new_remote_collection = remoteSources.RemoteCollection.fromInvioCollection(
+                new_invio_collection)
+
+            self.remote_collections.append(new_remote_collection)
+
+            # we should be able to cut everything from here
+            for each_source in new_invio_collection.sources:
                 new_remote = remoteSources.RemoteSource.fromInvioSource(
                     each_source)
-                self.Remote_sources.append(new_remote)
+
+                # self.Remote_sources.append(new_remote)
                 self.remote_sources_map[new_remote.remote] = new_remote.name
 
                 # get remote data
@@ -215,6 +247,7 @@ class PaletteExplorer:
 
             case 'application/json':
                 # we got back our inventory
+
                 self.Remote_assets = json.loads(data.decode())
                 self.Has_inventory = True
                 self.asset_treeDAT.cook(force=True)
@@ -227,10 +260,7 @@ class PaletteExplorer:
                     case "json":
                         # NOTE KEEP TRACK HERE
                         data: dict = json.loads(data.decode())
-                        new_cloud_palette_collection = cloudPaletteType.cloudPaletteCollection.from_json(
-                            data, remoteSources=self.remote_sources_map)
-                        self.Remote_data.append(new_cloud_palette_collection)
-                        self.asset_treeDAT.cook(force=True)
+                        self.handle_inventory_return(data=data)
 
                     case "tox":
                         self.CreatePaletteTOX(
@@ -241,6 +271,19 @@ class PaletteExplorer:
                         pass
             case _:
                 pass
+
+    def handle_inventory_return(self, data: dict) -> None:
+        new_cloud_palette_collection = cloudPaletteType.cloudPaletteCollection.from_json(
+            data, remoteSources=self.remote_sources_map)
+
+        # loop through our collections and ensure the data finds its way home
+        for each_remote_collection in self.remote_collections:
+            for each_remote_source in each_remote_collection.sources:
+                if new_cloud_palette_collection.source == each_remote_source.remote:
+                    each_remote_source.paletteCollection = new_cloud_palette_collection
+                    break
+
+        self.asset_treeDAT.cook(force=True)
 
     def PaletteWindow(self, state) -> None:
         '''
@@ -519,7 +562,6 @@ class PaletteExplorer:
     def Build_lister_asset_tree(self) -> list:
         '''
         '''
-
         # clear asset tree list
         self._asset_tree_list = tdu.Dependency([])
         self._asset_tree_list.val.append(
@@ -528,37 +570,32 @@ class PaletteExplorer:
         # add all elements from remotes
         self._add_asset_tree_elements_from_remotes()
 
-        # add all elements from folder DAT
-        # self._add_asset_tree_elements_from_table(
-        #     author='Derivative', tableSource=self._td_palette_DAT)
-
         return self._asset_tree_list
-
-    def _get_toxes_from_remote_data(self) -> list:
-        ...
 
     def _add_asset_tree_elements_from_remotes(self) -> None:
         '''
         '''
 
-        authors = set()
-
-        for each in self.Remote_data:
-
-            authors.add(each.author)
-            new_folder_row = listerDataInterface.FolderRow(root=each.author)
-            new_folder_row.cloudAsset = each
-            self._asset_tree_list.val.append(new_folder_row.as_list)
-
-            for each_asset in each.collection:
-                new_lister_row = listerDataInterface.AssetRow(
-                    root=each.author, cloudAsset=each_asset)
-
-                self._asset_tree_list.val.append(new_lister_row.as_list)
-
-        for each_author in authors:
-            new_author_row = listerDataInterface.AuthorRow(root=each.author)
+        for each in self.remote_collections:
+            new_author_row = listerDataInterface.AuthorRow(root=each.name)
             self._asset_tree_list.val.append(new_author_row.as_list)
+
+            for each_source in each.sources:
+                if each_source.paletteCollection == None:
+                    pass
+                else:
+                    new_folder_row = listerDataInterface.FolderRow(
+                        root=each.name)
+                    new_folder_row.cloudAsset = each_source
+                    new_folder_row.cloudAsset.sub_dir = each_source.paletteCollection.sub_dir
+                    self._asset_tree_list.val.append(
+                        new_folder_row.as_list)
+
+                    for each_asset in each_source.paletteCollection.collection:
+                        new_lister_row = listerDataInterface.AssetRow(
+                            root=each_asset.author, cloudAsset=each_asset)
+                        self._asset_tree_list.val.append(
+                            new_lister_row.as_list)
 
     def _add_asset_tree_elements_from_table(self, author: str, tableSource: OP) -> None:
         '''

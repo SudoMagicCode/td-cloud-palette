@@ -162,18 +162,20 @@ class PaletteExplorer:
     def _download_remote_tox_files(self) -> None:
         files_list: list[downloader.dl_target] = []
 
-        for each in self.Remote_data:
-            for each_asset in each.collection:
-                if each_asset.assetType == cloudPaletteType.paletteType.folder:
+        for each in self.remote_collections:
+            for each_source in each.sources:
+                if each_source.paletteCollection == None:
                     pass
                 else:
-                    new_dl_target = downloader.dl_target(
-                        name=each_asset.display_name,
-                        author=each_asset.author,
-                        path=f'{self.Local_tox_cache}/{each_asset.asset_local_path}',
-                        url=each_asset.asset_url)
+                    for each_asset in each_source.paletteCollection.collection:
+                        if each_asset.assetType != cloudPaletteType.paletteType.folder:
+                            new_dl_target = downloader.dl_target(
+                                name=each_asset.display_name,
+                                author=each_asset.author,
+                                path=f'{self.Local_tox_cache}/{each_asset.asset_local_path}',
+                                url=each_asset.asset_url)
 
-                    files_list.append(new_dl_target)
+                            files_list.append(new_dl_target)
 
         downloader.download(
             worker_info=files_list, targetOP=self.MyOp)
@@ -218,7 +220,6 @@ class PaletteExplorer:
 
             self.remote_collections.append(new_remote_collection)
 
-            # we should be able to cut everything from here
             for each_source in new_invio_collection.sources:
                 new_remote = remoteSources.RemoteSource.fromInvioSource(
                     each_source)

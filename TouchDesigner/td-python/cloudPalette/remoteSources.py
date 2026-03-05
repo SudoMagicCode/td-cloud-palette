@@ -53,6 +53,7 @@ class RemoteSource:
     name: str
     remote: str
     author: str
+    collection_name: str
     paletteCollection: cloudPaletteType.cloudPaletteCollection = None
 
     @property
@@ -63,11 +64,16 @@ class RemoteSource:
         return 'Class <RemoteSource>'
 
     @staticmethod
-    def fromInvioSource(source: InvioSource):
-        name: str = source.name
-        remote: str = source.link
-        author: str = remote.split('/')[1]
-        return RemoteSource(name=name, remote=remote, author=author)
+    def fromInvioSource(collection: str, source: InvioSource):
+        name = source.name
+        remote = source.link
+        author = remote.split('/')[1]
+
+        return RemoteSource(
+            name=name,
+            remote=remote,
+            author=author,
+            collection_name=collection)
 
 
 @dataclass
@@ -85,10 +91,12 @@ class RemoteCollection:
         name: str = invio.name
 
         for each in invio.sources:
-            newSource: RemoteSource = RemoteSource.fromInvioSource(each)
+            newSource: RemoteSource = RemoteSource.fromInvioSource(
+                name, each)
             remoteSources.append(newSource)
 
         newCollection = InvioCollection(
-            name=name, sources=remoteSources)
+            name=name,
+            sources=remoteSources)
 
         return newCollection

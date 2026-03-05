@@ -222,7 +222,7 @@ class PaletteExplorer:
 
             for each_source in new_invio_collection.sources:
                 new_remote = remoteSources.RemoteSource.fromInvioSource(
-                    each_source)
+                    new_remote_collection.name, each_source)
 
                 # self.Remote_sources.append(new_remote)
                 self.remote_sources_map[new_remote.remote] = new_remote.name
@@ -274,12 +274,15 @@ class PaletteExplorer:
                 pass
 
     def handle_inventory_return(self, data: dict) -> None:
-        new_cloud_palette_collection = cloudPaletteType.cloudPaletteCollection.from_json(
-            data, remoteSources=self.remote_sources_map)
 
         # loop through our collections and ensure the data finds its way home
         for each_remote_collection in self.remote_collections:
             for each_remote_source in each_remote_collection.sources:
+                each_remote_source.collection_name = each_remote_collection.name
+
+                new_cloud_palette_collection = cloudPaletteType.cloudPaletteCollection.from_json(
+                    data, remoteSources=self.remote_sources_map, root=each_remote_source.collection_name)
+
                 if new_cloud_palette_collection.source == each_remote_source.remote:
                     each_remote_source.paletteCollection = new_cloud_palette_collection
                     break
@@ -594,7 +597,7 @@ class PaletteExplorer:
 
                     for each_asset in each_source.paletteCollection.collection:
                         new_lister_row = listerDataInterface.AssetRow(
-                            root=each_asset.author, cloudAsset=each_asset)
+                            root=each.name, cloudAsset=each_asset)
                         self._asset_tree_list.val.append(
                             new_lister_row.as_list)
 

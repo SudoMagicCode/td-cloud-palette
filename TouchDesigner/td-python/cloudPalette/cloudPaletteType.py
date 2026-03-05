@@ -85,7 +85,7 @@ class cloudPaletteAsset(cloudPaletteElement):
         return self.assetType.name
 
     @staticmethod
-    def from_github_response(data: dict, author: str, source: str, subDir: str):
+    def from_github_response(data: dict, author: str, source: str, root: str, subDir: str):
 
         raw_name: str = data.get("display_name", "unknown")
         raw_asset_path: str = data.get("asset_path")
@@ -105,7 +105,7 @@ class cloudPaletteAsset(cloudPaletteElement):
         asset_type = _type_string_to_type(data.get("type"))
         is_compatible = None if asset_type == paletteType.folder else _check_compatible(
             td_version)
-        l_path = f"{author}/{subDir}/{lister_path}"
+        l_path = f"{root}/{subDir}/{lister_path}"
         path_on_disk = f"{'/'.join(l_path.split('/')[:-1])}/{asset_path_elements[-1]}"
 
         isTox = True if asset_type in [
@@ -136,20 +136,24 @@ class cloudPaletteAsset(cloudPaletteElement):
 
 @dataclass
 class cloudPaletteCollection(cloudPaletteElement):
+    root: str
     sub_dir: str
     elementType = elementType.collection
     collection: list[cloudPaletteAsset] = field(default_factory=list)
 
     @staticmethod
-    def from_json(info: dict, remoteSources: dict):
+    def from_json(info: dict, remoteSources: dict, root: str):
         author = info.get('author', 'unknown')
         source = info.get('source', 'unknown')
         elements: list[cloudPaletteAsset] = []
         sub_dir = remoteSources.get(source, '')
-
         for each in info.get('collection', []):
             new_cloud_palette_asset = cloudPaletteAsset.from_github_response(
-                data=each, author=author, source=source, subDir=sub_dir)
+                data=each,
+                author=author,
+                source=source,
+                root=root,
+                subDir=sub_dir)
 
             elements.append(new_cloud_palette_asset)
 
@@ -158,6 +162,7 @@ class cloudPaletteCollection(cloudPaletteElement):
             sub_dir=sub_dir,
             author=author,
             source=source,
+            root='',
             collection=elements)
 
         return new_collection

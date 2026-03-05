@@ -27,6 +27,7 @@ Name | Access | Description |
 [SM TD Templates](https://github.com/SudoMagicCode/sm-td-templates) | 🌎 Public | A collection of starting points for networks |
 [SM TD Tools](https://github.com/SudoMagicCode/sm-td-tools) | 🌎 Public | A collection of drop in tools |
 [SM POP Tools](https://github.com/SudoMagicCode/sm-td-pop-tools) | 🌎 Public | A collection of POP helpers |
+[SM Instancing Examples](https://github.com/SudoMagicCode/sm-td-instancing-examples) | 🌎 Public | A collection of instancing examples |
 
 ## Using Cloud Palette in TouchDesigner
 

@@ -87,7 +87,6 @@ def onPulse(cur: Union[Any, List[Any]]):
     Args:
             cur: The parameter(s) that were pulsed
     """
-    print(cur.name)
     match cur.name:
         case 'Loadinventory':
             parent().Load_inventory()
@@ -95,6 +94,9 @@ def onPulse(cur: Union[Any, List[Any]]):
             parent().Download_tox_files()
         case 'Deletelocalcache':
         	parent().Delete_local_cache()
+        case 'Update' :
+        	parent().Update_tox()
         case _:
-            ...
+        	print(cur.name)
+
     return

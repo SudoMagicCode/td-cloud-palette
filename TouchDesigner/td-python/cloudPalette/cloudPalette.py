@@ -123,6 +123,13 @@ class PaletteExplorer:
         # refresh assets
         self._query_cloud()
 
+    def Open_settings(self) -> None:
+        parent.cloudPalette.openParameters()
+        print("open settings")
+
+    def Update_tox(self) -> None:
+        print("user request to update TOX")
+
     def Load_inventory(self) -> None:
         self.decoratedLog.log_to_textport('Importing cloud palette inventory')
 

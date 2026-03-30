@@ -29,7 +29,6 @@ class InvioCollection:
 
     @staticmethod
     def fromJson(json: dict):
-        print("------------- > creating collection")
         remoteSources = []
         name: str = json.get('name', 'unnamed')
 
@@ -86,7 +85,7 @@ class RemoteCollection:
 
     @staticmethod
     def fromInvioCollection(invio: InvioCollection):
-        print("------------- > creating collection")
+        # print("------------- > creating collection")
         remoteSources = []
         name: str = invio.name
 

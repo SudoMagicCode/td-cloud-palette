@@ -93,10 +93,12 @@ def onPulse(cur: Union[Any, List[Any]]):
         case 'Buildlocalcache':
             parent().Download_tox_files()
         case 'Deletelocalcache':
-        	parent().Delete_local_cache()
-        case 'Update' :
-        	parent().Update_tox()
+            parent().Delete_local_cache()
+        case 'Update':
+            parent().Update_tox()
+        case 'Refresh':
+            parent().Refresh_inventory()
         case _:
-        	print(cur.name)
+            print(cur.name)
 
     return

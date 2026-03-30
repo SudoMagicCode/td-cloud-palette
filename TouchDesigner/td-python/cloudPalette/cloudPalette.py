@@ -104,11 +104,6 @@ class PaletteExplorer:
 
         self._check_cache_file()
 
-    def _query_cloud(self,) -> None:
-        '''
-        '''
-        pass
-
     def _check_cache_file(self) -> None:
         if os.path.exists(self.user_cache_file):
             self._load_user_cache_file()
@@ -118,17 +113,19 @@ class PaletteExplorer:
         with open(self.user_cache_file, 'r') as json_file:
             self._inventory_data = json.load(json_file)
 
-        self._gather_remote_sources()
-
         # refresh assets
-        self._query_cloud()
+        self._gather_remote_sources()
 
     def Open_settings(self) -> None:
         parent.cloudPalette.openParameters()
-        print("open settings")
 
     def Update_tox(self) -> None:
-        print("user request to update TOX")
+        self.decoratedLog.log_to_textport("Update TOX")
+
+    def Refresh_inventory(self):
+        self.decoratedLog.log_to_textport("Refresh Palette")
+        self._set_ui_status('Refreshing Inventory')
+        self._gather_remote_sources()
 
     def Load_inventory(self) -> None:
         self.decoratedLog.log_to_textport('Importing cloud palette inventory')
@@ -216,8 +213,6 @@ class PaletteExplorer:
 
         sources = self._inventory_data.get('paletteElements')
 
-        print('gathering remotes')
-
         # rebuild remote sources based on contents
         for each_collection in sources:
             new_invio_collection = remoteSources.InvioCollection.fromJson(
@@ -239,10 +234,6 @@ class PaletteExplorer:
                     f"remote source {new_remote.name}")
                 self.webClientDAT.request(
                     new_remote.remote_inventory, "GET")
-
-    def Refresh_inventory(self):
-        self._set_ui_status('Refreshing Inventory')
-        self._query_cloud()
 
     def Parse_cloud_response(self, data, headerDict: dict):
         '''
